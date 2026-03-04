@@ -36,7 +36,7 @@ const AppLayout: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const vendor = useAppSelector((s) => s.auth.vendor);
-  const unreadCount = useAppSelector((s) => s.notifications.unreadCount);
+  const unreadCount = useAppSelector((s) => s.notifications?.unreadCount ?? 0);
   const path = window.location.pathname;
   const pageInfo = PAGE_TITLES[path] || { title: 'Vendor Panel', sub: 'LocalShop' };
 

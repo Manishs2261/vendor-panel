@@ -87,7 +87,7 @@ export const PaymentsPage: React.FC = () => {
 };
 
 // ─── Notifications Page ───────────────────────────────────────────────────────
-import { fetchNotifications, markRead, markAllRead } from './notificationSlice';
+import { fetchNotifications, markRead, markAllRead } from '../notifications/notificationSlice';
 import type { Notification } from '../../types';
 
 const MOCK_NOTIFS: Notification[] = [
@@ -103,7 +103,7 @@ const NOTIF_ICONS: Record<string, string> = {
 
 export const NotificationsPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { items, loading, unreadCount } = useAppSelector((s) => s.notifications);
+  const { items, loading, unreadCount } = useAppSelector((s) => s.notifications ?? { items: [], loading: false, unreadCount: 0 });
   const notifs = items.length > 0 ? items : MOCK_NOTIFS;
 
   useEffect(() => { dispatch(fetchNotifications({})); }, [dispatch]);
