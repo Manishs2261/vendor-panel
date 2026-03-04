@@ -1,0 +1,127 @@
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { authApi } from '../../api/services';
+import { auth, googleProvider } from '../../utils/firebase';
+import { signInWithPopup } from 'firebase/auth';
+import type { Vendor } from '../../types';
+
+interface AuthState {
+  vendor: Vendor | null;
+  loading: boolean;
+  error: string | null;
+  otpStep: 'idle' | 'email_sent' | 'phone_sent' | 'verified';
+}
+
+const initialState: AuthState = {
+  vendor: null,
+  loading: false,
+  error: null,
+  otpStep: 'idle',
+};
+
+// ─── Thunks ───────────────────────────────────────────────────────────────────
+export const loginThunk = createAsyncThunk(
+  'auth/login',
+  async ({ email, password }: { email: string; password: string }, { rejectWithValue }) => {
+    try {
+      const { data } = await authApi.login(email, password);
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      return data.user;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Login failed');
+    }
+  }
+);
+
+export const registerThunk = createAsyncThunk(
+  'auth/register',
+  async (payload: { name: string; email: string; phone: string; password: string }, { rejectWithValue }) => {
+    try {
+      const { data } = await authApi.register(payload);
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Registration failed');
+    }
+  }
+);
+
+export const googleLoginThunk = createAsyncThunk(
+  'auth/googleLogin',
+  async (_, { rejectWithValue }) => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const firebase_token = await result.user.getIdToken();
+      const { data } = await authApi.googleLogin(firebase_token);
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      return data.user;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Google login failed');
+    }
+  }
+);
+
+export const verifyEmailOtpThunk = createAsyncThunk(
+  'auth/verifyEmailOtp',
+  async ({ email, otp }: { email: string; otp: string }, { rejectWithValue }) => {
+    try {
+      const { data } = await authApi.verifyEmailOtp(email, otp);
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      return data.user;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'OTP verification failed');
+    }
+  }
+);
+
+export const fetchMeThunk = createAsyncThunk('auth/me', async (_, { rejectWithValue }) => {
+  try {
+    const { data } = await authApi.me();
+    return data;
+  } catch (err: any) {
+    return rejectWithValue(err.response?.data?.message || 'Session expired');
+  }
+});
+
+// ─── Slice ────────────────────────────────────────────────────────────────────
+const authSlice = createSlice({
+  name: 'auth',
+  initialState,
+  reducers: {
+    logout(state) {
+      state.vendor = null;
+      localStorage.clear();
+    },
+    clearError(state) { state.error = null; },
+    setOtpStep(state, action) { state.otpStep = action.payload; },
+  },
+  extraReducers: (builder) => {
+    const pending = (state: AuthState) => { state.loading = true; state.error = null; };
+    const rejected = (state: AuthState, action: any) => { state.loading = false; state.error = action.payload as string; };
+
+    builder
+      .addCase(loginThunk.pending, pending)
+      .addCase(loginThunk.fulfilled, (state, action) => { state.loading = false; state.vendor = action.payload; })
+      .addCase(loginThunk.rejected, rejected)
+
+      .addCase(googleLoginThunk.pending, pending)
+      .addCase(googleLoginThunk.fulfilled, (state, action) => { state.loading = false; state.vendor = action.payload; })
+      .addCase(googleLoginThunk.rejected, rejected)
+
+      .addCase(verifyEmailOtpThunk.pending, pending)
+      .addCase(verifyEmailOtpThunk.fulfilled, (state, action) => { state.loading = false; state.vendor = action.payload; state.otpStep = 'verified'; })
+      .addCase(verifyEmailOtpThunk.rejected, rejected)
+
+      .addCase(fetchMeThunk.pending, pending)
+      .addCase(fetchMeThunk.fulfilled, (state, action) => { state.loading = false; state.vendor = action.payload; })
+      .addCase(fetchMeThunk.rejected, (state) => { state.loading = false; state.vendor = null; localStorage.clear(); })
+
+      .addCase(registerThunk.pending, pending)
+      .addCase(registerThunk.fulfilled, (state) => { state.loading = false; state.otpStep = 'email_sent'; })
+      .addCase(registerThunk.rejected, rejected);
+  },
+});
+
+export const { logout, clearError, setOtpStep } = authSlice.actions;
+export default authSlice.reducer;
