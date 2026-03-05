@@ -1,1 +1,3 @@
-export { dashboardSlice as default, fetchDashboard } from '../slices';
+import { dashboardSlice, fetchDashboard } from "../slices";
+export { fetchDashboard };
+export default dashboardSlice.reducer;
