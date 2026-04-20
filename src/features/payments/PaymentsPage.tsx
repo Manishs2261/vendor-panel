@@ -13,7 +13,10 @@ const MOCK_PAYOUTS: Payout[] = [
 
 export const PaymentsPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { items, loading, commission } = useAppSelector((s) => s.payments);
+  const paymentsState = useAppSelector((s) => s.payments);
+  const items = paymentsState?.items ?? [];
+  const loading = paymentsState?.loading ?? false;
+  const commission = paymentsState?.commission ?? null;
   const payouts = items.length > 0 ? items : MOCK_PAYOUTS;
 
   useEffect(() => {
@@ -103,7 +106,10 @@ const NOTIF_ICONS: Record<string, string> = {
 
 export const NotificationsPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { items, loading, unreadCount } = useAppSelector((s) => s.notifications ?? { items: [], loading: false, unreadCount: 0 });
+  const notifState = useAppSelector((s) => s.notifications);
+  const items = notifState?.items ?? [];
+  const loading = notifState?.loading ?? false;
+  const unreadCount = notifState?.unreadCount ?? 0;
   const notifs = items.length > 0 ? items : MOCK_NOTIFS;
 
   useEffect(() => { dispatch(fetchNotifications({})); }, [dispatch]);

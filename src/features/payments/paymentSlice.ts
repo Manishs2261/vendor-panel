@@ -1,1 +1,3 @@
-export { paymentSlice as default, fetchPayouts, fetchCommission } from '../slices';
+import { paymentSlice, fetchPayouts, fetchCommission } from "../slices";
+export { fetchPayouts, fetchCommission };
+export default paymentSlice.reducer;
