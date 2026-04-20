@@ -11,6 +11,31 @@ interface AuthState {
   otpStep: 'idle' | 'email_sent' | 'phone_sent' | 'verified';
 }
 
+const formatApiMessage = (value: any, fallback: string): string => {
+  if (!value) return fallback;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const messages = value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item?.msg) {
+          const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : null;
+          return field ? `${field}: ${item.msg}` : item.msg;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    return messages.length ? messages.join(', ') : fallback;
+  }
+  if (typeof value === 'object' && typeof value.msg === 'string') {
+    return value.msg;
+  }
+  return fallback;
+};
+
+const getApiErrorMessage = (err: any, fallback: string) =>
+  formatApiMessage(err?.response?.data?.detail, formatApiMessage(err?.response?.data?.message, fallback));
+
 const initialState: AuthState = {
   vendor: null,
   loading: false,
@@ -28,7 +53,7 @@ export const loginThunk = createAsyncThunk(
       localStorage.setItem('refresh_token', data.refresh_token);
       return data.user;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || 'Login failed');
+      return rejectWithValue(getApiErrorMessage(err, 'Login failed'));
     }
   }
 );
@@ -40,7 +65,7 @@ export const registerThunk = createAsyncThunk(
       const { data } = await authApi.register(payload);
       return data;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || 'Registration failed');
+      return rejectWithValue(getApiErrorMessage(err, 'Registration failed'));
     }
   }
 );
@@ -56,7 +81,7 @@ export const googleLoginThunk = createAsyncThunk(
       localStorage.setItem('refresh_token', data.refresh_token);
       return data.user;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || 'Google login failed');
+      return rejectWithValue(getApiErrorMessage(err, 'Google login failed'));
     }
   }
 );
@@ -70,7 +95,7 @@ export const verifyEmailOtpThunk = createAsyncThunk(
       localStorage.setItem('refresh_token', data.refresh_token);
       return data.user;
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || 'OTP verification failed');
+      return rejectWithValue(getApiErrorMessage(err, 'OTP verification failed'));
     }
   }
 );
@@ -80,7 +105,7 @@ export const fetchMeThunk = createAsyncThunk('auth/me', async (_, { rejectWithVa
     const { data } = await authApi.me();
     return data;
   } catch (err: any) {
-    return rejectWithValue(err.response?.data?.message || 'Session expired');
+    return rejectWithValue(getApiErrorMessage(err, 'Session expired'));
   }
 });
 

@@ -8,15 +8,23 @@ import type {
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
+type AuthTokenResponse = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user_id: number;
+  role: string;
+};
+
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
-    apiClient.post<{ access_token: string; refresh_token: string; user: Vendor }>(
+    apiClient.post<AuthTokenResponse>(
       '/auth/login/vendor', { email, password }
     ),
 
   register: (data: { name: string; email: string; phone: string; password: string }) =>
-    apiClient.post<{ message: string; user_id: string }>('/auth/register/vendor', data),
+    apiClient.post<AuthTokenResponse>('/auth/register/vendor', data),
 
   sendEmailOtp: (email: string) =>
     apiClient.post('/auth/otp/email/send', { email }),

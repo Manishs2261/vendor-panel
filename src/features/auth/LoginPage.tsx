@@ -7,6 +7,31 @@ import toast from 'react-hot-toast';
 
 type View = 'login' | 'register' | 'otp';
 
+const formatApiMessage = (value: any, fallback: string): string => {
+  if (!value) return fallback;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const messages = value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item?.msg) {
+          const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : null;
+          return field ? `${field}: ${item.msg}` : item.msg;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    return messages.length ? messages.join(', ') : fallback;
+  }
+  if (typeof value === 'object' && typeof value.msg === 'string') {
+    return value.msg;
+  }
+  return fallback;
+};
+
+const getApiErrorMessage = (err: any, fallback: string) =>
+  formatApiMessage(err?.response?.data?.detail, formatApiMessage(err?.response?.data?.message, fallback));
+
 const LoginPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -43,14 +68,13 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setLocalLoading(true);
     try {
-      await authApi.register({ name, email, phone, password });
-      await authApi.sendEmailOtp(email);
-      setPendingEmail(email);
-      setView('otp');
-      dispatch(setOtpStep('email_sent'));
-      toast.success('OTP sent to your email');
+      const { data } = await authApi.register({ name, email, phone, password });
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      toast.success('Account created successfully');
+      navigate('/dashboard');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Registration failed');
+      toast.error(getApiErrorMessage(err, 'Registration failed'));
     } finally {
       setLocalLoading(false);
     }
