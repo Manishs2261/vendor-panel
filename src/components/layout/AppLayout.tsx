@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logout } from '../../features/auth/authSlice';
 
@@ -7,17 +7,18 @@ const NAV = [
   {
     group: 'Main',
     items: [
-      { to: '/dashboard', icon: '⊞', label: 'Dashboard' },
-      { to: '/products', icon: '📦', label: 'Products' },
-      { to: '/analytics', icon: '📈', label: 'Analytics' },
+      { to: '/dashboard', icon: 'D', label: 'Dashboard' },
+      { to: '/products', icon: 'P', label: 'Products' },
+      { to: '/analytics', icon: 'A', label: 'Analytics' },
     ],
   },
   {
     group: 'Account',
     items: [
-      { to: '/shop', icon: '🏪', label: 'Shop Profile' },
-      { to: '/payments', icon: '💳', label: 'Payments' },
-      { to: '/notifications', icon: '🔔', label: 'Notifications', badge: 'unread' },
+      { to: '/shop', icon: 'S', label: 'Shop Profile' },
+      { to: '/payments', icon: 'M', label: 'Payments' },
+      { to: '/notifications', icon: 'N', label: 'Notifications', badge: 'unread' },
+      { to: '/settings', icon: 'T', label: 'Settings' },
     ],
   },
 ];
@@ -30,15 +31,16 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/shop': { title: 'Shop Profile', sub: 'Your shop details and gallery' },
   '/payments': { title: 'Payments', sub: 'Payouts and commission history' },
   '/notifications': { title: 'Notifications', sub: 'Push notification history' },
+  '/settings': { title: 'Settings', sub: 'Account access and session controls' },
 };
 
 const AppLayout: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const vendor = useAppSelector((s) => s.auth.vendor);
   const unreadCount = useAppSelector((s) => s.notifications?.unreadCount ?? 0);
-  const path = window.location.pathname;
-  const pageInfo = PAGE_TITLES[path] || { title: 'Vendor Panel', sub: 'LocalShop' };
+  const pageInfo = PAGE_TITLES[location.pathname] || { title: 'Vendor Panel', sub: 'LocalShop' };
 
   const handleLogout = () => {
     dispatch(logout());
@@ -47,7 +49,6 @@ const AppLayout: React.FC = () => {
 
   return (
     <div className="layout">
-      {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
           <div className="logo-mark">L</div>
@@ -56,7 +57,9 @@ const AppLayout: React.FC = () => {
             <div className="logo-badge">Vendor</div>
           </div>
         </div>
+
         <div className="sidebar-divider" />
+
         <nav className="sidebar-nav">
           {NAV.map((group) => (
             <div key={group.group} className="nav-group">
@@ -77,6 +80,7 @@ const AppLayout: React.FC = () => {
             </div>
           ))}
         </nav>
+
         <div className="sidebar-footer">
           <div className="vendor-card">
             <div className="vendor-avatar">
@@ -86,28 +90,30 @@ const AppLayout: React.FC = () => {
               <div className="vendor-name">{vendor?.name || 'Vendor'}</div>
               <div className="vendor-email">{vendor?.email || ''}</div>
             </div>
-            <button className="logout-btn" onClick={handleLogout} title="Logout">⏏</button>
+            <button className="logout-btn" onClick={handleLogout} title="Logout">
+              X
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* ── Main ── */}
       <div className="main-area">
         <header className="header">
           <div className="header-left">
             <div className="page-title">{pageInfo.title}</div>
             <div className="page-sub">{pageInfo.sub}</div>
           </div>
+
           <div className="header-right">
             <div className="search-box">
-              <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>🔍</span>
+              <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>S</span>
               <input placeholder="Search products..." />
             </div>
             <button className="icon-btn" onClick={() => navigate('/notifications')}>
-              🔔
+              N
               {unreadCount > 0 && <span className="notif-dot" />}
             </button>
-            <button className="icon-btn" onClick={() => navigate('/shop')}>⚙</button>
+            <button className="icon-btn" onClick={() => navigate('/settings')}>T</button>
           </div>
         </header>
 

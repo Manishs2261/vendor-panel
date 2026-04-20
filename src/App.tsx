@@ -14,6 +14,7 @@ import AnalyticsPage from './features/analytics/AnalyticsPage';
 import ShopPage from './features/shop/ShopPage';
 import { PaymentsPage } from './features/payments/PaymentsPage';
 import NotificationsPage from './features/notifications/NotificationsPage';
+import SettingsPage from './features/settings/SettingsPage';
 import { useAppDispatch } from './hooks/redux';
 import './styles/global.css';
 
@@ -46,6 +47,7 @@ const App: React.FC = () => (
               <Route path="/shop" element={<ShopPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>
 
