@@ -35,6 +35,9 @@ const ShopPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'details' | 'media' | 'location'>('details');
   const [phoneOtpStep, setPhoneOtpStep] = useState<'idle' | 'sent'>('idle');
   const [emailOtpStep, setEmailOtpStep] = useState<'idle' | 'sent'>('idle');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const logoRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
@@ -74,30 +77,67 @@ const ShopPage: React.FC = () => {
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setLogoPreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    
     const result = await dispatch(uploadLogo(file));
-    if (uploadLogo.fulfilled.match(result)) toast.success('Logo uploaded!');
+    if (uploadLogo.fulfilled.match(result)) {
+      toast.success('Logo uploaded!');
+      setLogoPreview(null); // Clear preview after successful upload
+    }
   };
 
   const handleBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setBannerPreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    
     const result = await dispatch(uploadBanner(file));
-    if (uploadBanner.fulfilled.match(result)) toast.success('Banner uploaded!');
+    if (uploadBanner.fulfilled.match(result)) {
+      toast.success('Banner uploaded!');
+      setBannerPreview(null); // Clear preview after successful upload
+    }
   };
 
   const handleGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    
+    // Create previews for all selected files
+    const newPreviews: string[] = [];
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const preview = event.target?.result as string;
+        setGalleryPreviews(prev => [...prev, preview]);
+      };
+      reader.readAsDataURL(file);
+    });
+    
     const result = await dispatch(uploadGallery(files));
-    if (uploadGallery.fulfilled.match(result)) toast.success('Gallery updated!');
+    if (uploadGallery.fulfilled.match(result)) {
+      toast.success('Gallery updated!');
+      setGalleryPreviews([]); // Clear previews after successful upload
+    }
   };
 
   const completionSteps = shop ? [
     { label: 'Shop name', done: !!shop.name },
     { label: 'Description', done: !!shop.description },
-    { label: 'Logo', done: !!shop.logo },
-    { label: 'Banner', done: !!shop.banner },
-    { label: 'Gallery', done: shop.gallery.length > 0 },
+    { label: 'Logo', done: !!shop.logo_url },
+    { label: 'Banner', done: !!shop.banner_url },
+    { label: 'Gallery', done: (shop.gallery && shop.gallery.length > 0) },
     { label: 'GST number', done: !!shop.gst_number },
     { label: 'Phone verified', done: !!shop.contact_phone },
     { label: 'Email verified', done: !!shop.contact_email },
@@ -252,7 +292,13 @@ const ShopPage: React.FC = () => {
               <div className="card-header"><div className="card-title">Shop Logo</div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
                 <div style={{ width: 80, height: 80, borderRadius: 'var(--radius)', background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid var(--border)', fontSize: 32 }}>
-                  {shop?.logo ? <img src={shop.logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '🏪'}
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : shop?.logo_url ? (
+                    <img src={shop.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    '🏪'
+                  )}
                 </div>
                 <div>
                   <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>PNG, JPG · Recommended 200×200</p>
@@ -266,8 +312,8 @@ const ShopPage: React.FC = () => {
 
             <div className="card">
               <div className="card-header"><div className="card-title">Shop Banner</div></div>
-              <div style={{ height: 100, background: shop?.banner ? `url(${shop.banner}) center/cover` : 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, fontSize: 28, cursor: 'pointer' }} onClick={() => bannerRef.current?.click()}>
-                {!shop?.banner && '🖼 Click to upload banner'}
+              <div style={{ height: 100, background: bannerPreview ? `url(${bannerPreview}) center/cover` : shop?.banner_url ? `url(${shop.banner_url}) center/cover` : 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, fontSize: 28, cursor: 'pointer' }} onClick={() => bannerRef.current?.click()}>
+                {!bannerPreview && !shop?.banner_url && '🖼 Click to upload banner'}
               </div>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Recommended 1200×300px</p>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => bannerRef.current?.click()} disabled={uploading}>
@@ -278,14 +324,25 @@ const ShopPage: React.FC = () => {
           </div>
 
           <div className="card">
-            <div className="card-header"><div className="card-title">Shop Gallery</div><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{shop?.gallery.length || 0} / 10 images</span></div>
+            <div className="card-header"><div className="card-title">Shop Gallery</div><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{(shop?.gallery?.length || 0)} / 10 images</span></div>
             <div className="image-grid">
-              {shop?.gallery.map((url, i) => (
-                <div key={i} className="image-item">
+              {/* Show existing gallery images */}
+              {(shop?.gallery || []).map((url, i) => (
+                <div key={`existing-${i}`} className="image-item">
                   <img src={url} alt={`Gallery ${i}`} />
                 </div>
               ))}
-              {(shop?.gallery.length || 0) < 10 && (
+              {/* Show preview images */}
+              {galleryPreviews.map((preview, i) => (
+                <div key={`preview-${i}`} className="image-item" style={{ opacity: 0.7, border: '2px dashed var(--accent)' }}>
+                  <img src={preview} alt={`Preview ${i}`} />
+                  <div style={{ position: 'absolute', top: 4, right: 4, background: 'var(--accent)', color: 'white', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 'bold' }}>
+                    +
+                  </div>
+                </div>
+              ))}
+              {/* Add more button */}
+              {(((shop?.gallery?.length || 0) + galleryPreviews.length) < 10) && (
                 <div className="image-item add" onClick={() => galleryRef.current?.click()}>
                   <span style={{ fontSize: 24, color: 'var(--text-dim)' }}>＋</span>
                 </div>

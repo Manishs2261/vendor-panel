@@ -18,8 +18,8 @@ export interface Shop {
   vendor_id: string;
   name: string;
   description: string;
-  logo?: string;
-  banner?: string;
+  logo_url?: string;
+  banner_url?: string;
   gallery: string[];
   address: string;
   city: string;
