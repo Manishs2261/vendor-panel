@@ -337,6 +337,9 @@ tbody td { padding: 12px 14px; font-size: 13.5px; color: var(--text); vertical-a
 .settings-value { font-size: 13.5px; color: var(--text); text-align: right; word-break: break-word; }
 .settings-danger-card { border-color: rgba(239,68,68,0.25); background: linear-gradient(180deg, rgba(239,68,68,0.08), rgba(17,17,31,0.95)); }
 .settings-danger-copy { font-size: 13px; line-height: 1.7; color: var(--text-muted); margin-bottom: 18px; }
+.approval-banner { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 16px 18px; border-radius: var(--radius); border: 1px solid rgba(245,158,11,0.28); background: linear-gradient(180deg, rgba(245,158,11,0.12), rgba(17,17,31,0.95)); }
+.approval-banner-title { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.approval-banner-text { font-size: 13px; line-height: 1.7; color: var(--text-muted); max-width: 760px; }
 .auth-divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
 .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .auth-divider span { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }

@@ -1,20 +1,28 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { fetchDashboard } from './dashboardSlice';
 import { StatusBadge } from '../../components/common';
+import { vendorApi, type VendorProfileResponse } from '../../api/services';
 
-// Mock data for charts
 const CHART_DATA = [
-  { day: 'Mon', views: 120 }, { day: 'Tue', views: 210 }, { day: 'Wed', views: 180 },
-  { day: 'Thu', views: 340 }, { day: 'Fri', views: 290 }, { day: 'Sat', views: 420 },
+  { day: 'Mon', views: 120 },
+  { day: 'Tue', views: 210 },
+  { day: 'Wed', views: 180 },
+  { day: 'Thu', views: 340 },
+  { day: 'Fri', views: 290 },
+  { day: 'Sat', views: 420 },
   { day: 'Sun', views: 380 },
 ];
 
 const MOCK = {
-  total_products: 48, active_products: 42, inactive_products: 6,
-  total_views: 8420, growth_rate: 12.4, completion_score: 78,
+  total_products: 48,
+  active_products: 42,
+  inactive_products: 6,
+  total_views: 8420,
+  growth_rate: 12.4,
+  completion_score: 78,
   recent_products: [
     { id: '1', name: 'Classic Silk Saree', category_name: 'Clothing', price: 2499, status: 'ACTIVE', click_count: 142, images: [] },
     { id: '2', name: 'Cotton Kurta Set', category_name: 'Clothing', price: 899, status: 'ACTIVE', click_count: 98, images: [] },
@@ -35,29 +43,56 @@ const COMPLETION_STEPS = [
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { data, loading } = useAppSelector((s) => s.dashboard);
+  const { data } = useAppSelector((s) => s.dashboard);
   const vendor = useAppSelector((s) => s.auth.vendor);
+  const [vendorProfile, setVendorProfile] = useState<VendorProfileResponse | null>(null);
   const stats = data || MOCK;
   const score = stats.completion_score;
 
-  useEffect(() => { dispatch(fetchDashboard()); }, [dispatch]);
+  useEffect(() => {
+    dispatch(fetchDashboard());
+  }, [dispatch]);
+
+  useEffect(() => {
+    let mounted = true;
+    vendorApi.me()
+      .then(({ data: profile }) => {
+        if (mounted) setVendorProfile(profile);
+      })
+      .catch(() => {
+        if (mounted) setVendorProfile(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const circumference = 2 * Math.PI * 30;
   const dashOffset = circumference - (score / 100) * circumference;
 
   return (
     <div>
-      {/* ── Welcome ── */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
-          Good morning, {vendor?.name?.split(' ')[0] || 'Vendor'} 👋
+          Good morning, {vendor?.name?.split(' ')[0] || 'Vendor'}
         </h1>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-          Here's what's happening with your shop today.
+          Here&apos;s what&apos;s happening with your shop today.
         </p>
       </div>
 
-      {/* ── Completion Card ── */}
+      {vendorProfile && vendorProfile.status !== 'approved' && (
+        <div className="approval-banner">
+          <div>
+            <div className="approval-banner-title">Vendor Approval Pending</div>
+            <div className="approval-banner-text">
+              You can continue adding and updating shop details. Admin approval is still pending, so approval-based actions may stay limited until your account is approved.
+            </div>
+          </div>
+          <span className={`badge ${vendorProfile.status}`}>{vendorProfile.status}</span>
+        </div>
+      )}
+
       <div className="completion-card">
         <div className="completion-ring">
           <svg width="72" height="72" viewBox="0 0 72 72">
@@ -70,7 +105,9 @@ const DashboardPage: React.FC = () => {
             <circle className="completion-ring-bg" cx="36" cy="36" r="30" />
             <circle
               className="completion-ring-fill"
-              cx="36" cy="36" r="30"
+              cx="36"
+              cy="36"
+              r="30"
               strokeDasharray={circumference}
               strokeDashoffset={dashOffset}
             />
@@ -83,7 +120,7 @@ const DashboardPage: React.FC = () => {
           <div className="completion-steps">
             {COMPLETION_STEPS.map((step) => (
               <div key={step.label} className={`completion-step ${step.done ? 'done' : 'todo'}`}>
-                <span>{step.done ? '✓' : '○'}</span>
+                <span>{step.done ? 'OK' : 'O'}</span>
                 <span>{step.label}</span>
               </div>
             ))}
@@ -94,14 +131,13 @@ const DashboardPage: React.FC = () => {
         </button>
       </div>
 
-      {/* ── Stats ── */}
       <div className="stats-grid">
         {[
-          { label: 'Total Products', value: stats.total_products, icon: '📦', color: 'indigo', trend: '+3 this week', up: true },
-          { label: 'Active Products', value: stats.active_products, icon: '✅', color: 'green', trend: '87.5% of total', up: true },
-          { label: 'Inactive', value: stats.inactive_products, icon: '⏸', color: 'yellow', trend: 'Need attention', up: false },
-          { label: 'Total Views', value: stats.total_views.toLocaleString(), icon: '👁', color: 'cyan', trend: `+${stats.growth_rate}%`, up: true },
-          { label: 'Growth Rate', value: `${stats.growth_rate}%`, icon: '📈', color: 'purple', trend: 'vs last month', up: true },
+          { label: 'Total Products', value: stats.total_products, icon: 'P', color: 'indigo', trend: '+3 this week', up: true },
+          { label: 'Active Products', value: stats.active_products, icon: 'A', color: 'green', trend: '87.5% of total', up: true },
+          { label: 'Inactive', value: stats.inactive_products, icon: 'I', color: 'yellow', trend: 'Need attention', up: false },
+          { label: 'Total Views', value: stats.total_views.toLocaleString(), icon: 'V', color: 'cyan', trend: `+${stats.growth_rate}%`, up: true },
+          { label: 'Growth Rate', value: `${stats.growth_rate}%`, icon: 'G', color: 'purple', trend: 'vs last month', up: true },
         ].map((s) => (
           <div key={s.label} className="stat-card">
             <div className="stat-card-top">
@@ -114,7 +150,6 @@ const DashboardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* ── Chart + Recent Products ── */}
       <div className="grid-2-1">
         <div className="card">
           <div className="card-header">
@@ -146,10 +181,10 @@ const DashboardPage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
-              { icon: '➕', label: 'Add New Product', to: '/products/new', color: 'var(--accent)' },
-              { icon: '📊', label: 'View Analytics', to: '/analytics', color: 'var(--accent2)' },
-              { icon: '🏪', label: 'Edit Shop Profile', to: '/shop', color: 'var(--green)' },
-              { icon: '💳', label: 'Check Payments', to: '/payments', color: 'var(--yellow)' },
+              { icon: '+', label: 'Add New Product', to: '/products/new' },
+              { icon: 'A', label: 'View Analytics', to: '/analytics' },
+              { icon: 'S', label: 'Edit Shop Profile', to: '/shop' },
+              { icon: 'M', label: 'Check Payments', to: '/payments' },
             ].map((action) => (
               <button
                 key={action.label}
@@ -165,12 +200,11 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Recent Products ── */}
       <div className="card" style={{ marginTop: 20 }}>
         <div className="card-header">
           <div className="card-title">Recent Products</div>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/products')}>
-            View All →
+            View All
           </button>
         </div>
         <div className="table-wrap">
@@ -189,12 +223,14 @@ const DashboardPage: React.FC = () => {
                 <tr key={p.id} onClick={() => navigate(`/products/${p.id}/edit`)} style={{ cursor: 'pointer' }}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div className="product-img" style={{ background: 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📦</div>
+                      <div className="product-img" style={{ background: 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                        P
+                      </div>
                       <span className="product-name">{p.name}</span>
                     </div>
                   </td>
                   <td style={{ color: 'var(--text-muted)' }}>{p.category_name}</td>
-                  <td>₹{p.price.toLocaleString()}</td>
+                  <td>Rs {p.price.toLocaleString()}</td>
                   <td><StatusBadge status={p.status} /></td>
                   <td>{p.click_count}</td>
                 </tr>

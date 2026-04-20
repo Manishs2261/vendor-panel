@@ -1,10 +1,27 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
-import { fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery } from './shopSlice';
+import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery } from './shopSlice';
 import type { ShopForm } from '../../types';
 import toast from 'react-hot-toast';
 
 const STATES = ['Chhattisgarh', 'Maharashtra', 'Madhya Pradesh', 'Uttar Pradesh', 'Delhi', 'Gujarat', 'Rajasthan', 'Karnataka', 'Tamil Nadu', 'West Bengal'];
+
+const buildShopPayload = (form: ShopForm) => ({
+  name: form.name,
+  description: form.description || undefined,
+  address: form.address || undefined,
+  city: form.city || undefined,
+  state: form.state || undefined,
+  country: 'India',
+  pincode: form.postal_code || undefined,
+  latitude: typeof form.latitude === 'number' && !Number.isNaN(form.latitude) ? form.latitude : undefined,
+  longitude: typeof form.longitude === 'number' && !Number.isNaN(form.longitude) ? form.longitude : undefined,
+  logo_url: undefined,
+  banner_url: undefined,
+  opening_time: undefined,
+  closing_time: undefined,
+  working_days: undefined,
+});
 
 const ShopPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -43,9 +60,14 @@ const ShopPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const result = await dispatch(updateShop(form));
+    const payload = buildShopPayload(form) as any;
+    const result = shop
+      ? await dispatch(updateShop(payload))
+      : await dispatch(createShop(payload));
     setSaving(false);
-    if (updateShop.fulfilled.match(result)) toast.success('Shop updated!');
+    if (createShop.fulfilled.match(result) || updateShop.fulfilled.match(result)) {
+      toast.success(shop ? 'Shop updated!' : 'Shop created!');
+    }
     else toast.error('Failed to update shop');
   };
 

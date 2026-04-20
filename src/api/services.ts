@@ -16,6 +16,19 @@ type AuthTokenResponse = {
   role: string;
 };
 
+export type VendorProfileResponse = {
+  id: number;
+  user_id: number;
+  business_name: string;
+  business_email?: string;
+  business_phone?: string;
+  gst_number?: string;
+  status: string;
+  verified: boolean;
+  total_earnings?: number;
+  created_at?: string;
+};
+
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 export const authApi = {
   login: (email: string, password: string) =>
@@ -62,6 +75,10 @@ export const authApi = {
 };
 
 // ─── Shop API ─────────────────────────────────────────────────────────────────
+export const vendorApi = {
+  me: () => apiClient.get<VendorProfileResponse>('/vendor/me'),
+};
+
 export const shopApi = {
   getMyShop: () => apiClient.get<Shop>('/vendor/shop'),
 
