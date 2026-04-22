@@ -47,7 +47,7 @@ const ProductFormPage: React.FC = () => {
           name: data.name, description: data.description, price: data.price,
           discount_percentage: data.discount_percentage, category_id: data.category_id,
           subcategory_id: data.subcategory_id || '', brand: data.brand || '',
-          tags: data.tags, sku: data.sku, stock: data.stock,
+          tags: data.tags, sku: data.sku || '', stock: data.stock,
           latitude: data.latitude, longitude: data.longitude,
           variations: data.variations, status: data.status as 'ACTIVE' | 'INACTIVE',
         });
@@ -75,30 +75,30 @@ const ProductFormPage: React.FC = () => {
   };
 
   const addTag = () => {
-    if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
-      set('tags', [...form.tags, tagInput.trim()]);
+    if (tagInput.trim() && !(form.tags || []).includes(tagInput.trim())) {
+      set('tags', [...(form.tags || []), tagInput.trim()]);
     }
     setTagInput('');
   };
 
-  const removeTag = (t: string) => set('tags', form.tags.filter((tag) => tag !== t));
+  const removeTag = (t: string) => set('tags', (form.tags || []).filter((tag) => tag !== t));
 
   const addVariation = (color: string) => {
-    if (form.variations.find((v) => v.color === color)) return;
-    set('variations', [...form.variations, { color, hex: COLOR_HEX[color] || '#888', stock: 0, images: [] }]);
+    if ((form.variations || []).find((v) => v.color === color)) return;
+    set('variations', [...(form.variations || []), { color, hex: COLOR_HEX[color] || '#888', stock: 0, images: [] }]);
   };
 
   const updateVariation = (idx: number, key: keyof ColorVariation, value: any) => {
-    const next = [...form.variations];
+    const next = [...(form.variations || [])];
     next[idx] = { ...next[idx], [key]: value };
     set('variations', next);
   };
 
-  const removeVariation = (idx: number) => set('variations', form.variations.filter((_, i) => i !== idx));
+  const removeVariation = (idx: number) => set('variations', (form.variations || []).filter((_, i) => i !== idx));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.price || !form.category_id || !form.sku) {
+    if (!form.name || !form.price || !form.category_id) {
       toast.error('Please fill all required fields'); return;
     }
     setSubmitting(true);
@@ -120,8 +120,8 @@ const ProductFormPage: React.FC = () => {
     }
   };
 
-  const parentCategories = categories.filter((c) => !c.parent_id);
-  const subCategories = categories.filter((c) => c.parent_id === form.category_id);
+  const parentCategories = (categories || []).filter((c) => !c.parent_id);
+  const subCategories = (categories || []).filter((c) => c.parent_id === form.category_id);
   const discountedPrice = form.price * (1 - form.discount_percentage / 100);
 
   return (
@@ -162,14 +162,14 @@ const ProductFormPage: React.FC = () => {
                   <input className="form-input" value={form.brand} onChange={(e) => set('brand', e.target.value)} placeholder="Brand name" />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">SKU <span>*</span></label>
-                  <input className="form-input" value={form.sku} onChange={(e) => set('sku', e.target.value)} placeholder="e.g. SAR-SLK-001" required />
+                  <label className="form-label">SKU</label>
+                  <input className="form-input" value={form.sku} onChange={(e) => set('sku', e.target.value)} placeholder="e.g. SAR-SLK-001" />
                 </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Tags</label>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                  {form.tags.map((t) => (
+                  {(form.tags || []).map((t) => (
                     <span key={t} className="tag">{t}<span className="tag-remove" onClick={() => removeTag(t)}>×</span></span>
                   ))}
                 </div>
@@ -223,16 +223,16 @@ const ProductFormPage: React.FC = () => {
               {COLORS.map((color) => (
                 <div
                   key={color}
-                  className={`color-swatch ${form.variations.find((v) => v.color === color) ? 'selected' : ''}`}
+                  className={`color-swatch ${(form.variations || []).find((v) => v.color === color) ? 'selected' : ''}`}
                   style={{ background: COLOR_HEX[color] }}
                   onClick={() => addVariation(color)}
                   title={color}
                 />
               ))}
             </div>
-            {form.variations.length > 0 && (
+            {(form.variations || []).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {form.variations.map((v, i) => (
+                {(form.variations || []).map((v, i) => (
                   <div key={v.color} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)' }}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', background: v.hex, border: '2px solid rgba(255,255,255,0.2)', flexShrink: 0 }} />
                     <span style={{ fontSize: 13, flex: 1 }}>{v.color}</span>

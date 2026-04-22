@@ -139,7 +139,7 @@ export interface ListState<T> { items: T[]; total: number; page: number; pages: 
 export interface ProductForm {
   name: string; description: string; price: number; discount_percentage: number;
   category_id: string; subcategory_id?: string; brand: string; tags: string[];
-  sku: string; stock: number; latitude?: number; longitude?: number;
+  sku?: string; stock: number; latitude?: number; longitude?: number;
   variations: ColorVariation[]; status: 'ACTIVE' | 'INACTIVE';
 }
 

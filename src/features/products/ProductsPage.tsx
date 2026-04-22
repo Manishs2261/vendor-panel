@@ -122,10 +122,8 @@ const ProductsPage: React.FC = () => {
           </div>
           <select className="form-select" style={{ width: 140 }} value={filters.status} onChange={(e) => dispatch(setFilter({ status: e.target.value }))}>
             <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="PENDING">Pending</option>
-            <option value="REJECTED">Rejected</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
           <select className="form-select" style={{ width: 160 }} value={filters.category_id} onChange={(e) => dispatch(setFilter({ category_id: e.target.value }))}>
             <option value="">All Categories</option>
