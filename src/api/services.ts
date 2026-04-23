@@ -122,7 +122,18 @@ export const productApi = {
   list: (params: {
     page?: number; limit?: number; search?: string;
     status?: string; category_id?: string;
-  }) => apiClient.get<PaginatedResponse<Product>>('/vendor/products', { params }),
+    stock_filter?: string; stock_min?: number | string; stock_max?: number | string;
+    min_price?: number | string; max_price?: number | string;
+    discount_only?: boolean;
+    created_from?: string; created_to?: string;
+    updated_from?: string; updated_to?: string;
+    sort_by?: string;
+  }) => {
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, value]) => value !== '' && value !== undefined && value !== null && value !== false)
+    );
+    return apiClient.get<PaginatedResponse<Product>>('/vendor/products', { params: cleanParams });
+  },
 
   get: (id: string) => apiClient.get<Product>(`/vendor/products/${id}`),
 

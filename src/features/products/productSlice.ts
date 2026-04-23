@@ -6,13 +6,36 @@ interface ProductState extends ListState<Product> {
   selected: Product | null;
   selectedIds: string[];
   categories: Category[];
-  filters: { search: string; status: string; category_id: string; page: number; limit: number };
+  filters: {
+    search: string;
+    status: string;
+    category_id: string;
+    stock_filter: string;
+    stock_min: string;
+    stock_max: string;
+    min_price: string;
+    max_price: string;
+    discount_only: boolean;
+    created_from: string;
+    created_to: string;
+    updated_from: string;
+    updated_to: string;
+    sort_by: string;
+    page: number;
+    limit: number;
+  };
 }
 
 const initialState: ProductState = {
   items: [], total: 0, page: 1, pages: 0, loading: false, error: null,
   selected: null, selectedIds: [], categories: [],
-  filters: { search: '', status: '', category_id: '', page: 1, limit: 10 },
+  filters: {
+    search: '', status: '', category_id: '', stock_filter: '',
+    stock_min: '', stock_max: '', min_price: '', max_price: '',
+    discount_only: false, created_from: '', created_to: '',
+    updated_from: '', updated_to: '', sort_by: 'recent',
+    page: 1, limit: 10,
+  },
 };
 
 export const fetchProducts = createAsyncThunk('products/fetchAll', async (_, { getState, rejectWithValue }) => {
@@ -20,7 +43,7 @@ export const fetchProducts = createAsyncThunk('products/fetchAll', async (_, { g
     const { filters } = (getState() as any).products;
     const { data } = await productApi.list(filters);
     return data;
-  } catch (err: any) { return rejectWithValue(err.response?.data?.message || 'Failed to fetch products'); }
+  } catch (err: any) { return rejectWithValue(err.response?.data?.detail || err.response?.data?.message || 'Failed to fetch products'); }
 });
 
 export const fetchCategories = createAsyncThunk('products/fetchCategories', async (_, { rejectWithValue }) => {
@@ -32,7 +55,7 @@ export const createProduct = createAsyncThunk(
   'products/create',
   async ({ form, images, video }: { form: ProductForm; images: File[]; video?: File }, { rejectWithValue }) => {
     try { const { data } = await productApi.create(form, images, video); return data; }
-    catch (err: any) { return rejectWithValue(err.response?.data?.message || 'Failed to create product'); }
+    catch (err: any) { return rejectWithValue(err.response?.data?.detail || err.response?.data?.message || 'Failed to create product'); }
   }
 );
 
@@ -40,25 +63,25 @@ export const updateProduct = createAsyncThunk(
   'products/update',
   async ({ id, form, newImages, video }: { id: string; form: Partial<ProductForm>; newImages?: File[]; video?: File }, { rejectWithValue }) => {
     try { const { data } = await productApi.update(id, form, newImages, video); return data; }
-    catch (err: any) { return rejectWithValue(err.response?.data?.message || 'Failed to update product'); }
+    catch (err: any) { return rejectWithValue(err.response?.data?.detail || err.response?.data?.message || 'Failed to update product'); }
   }
 );
 
 export const deleteProduct = createAsyncThunk('products/delete', async (id: string, { rejectWithValue }) => {
   try { await productApi.delete(id); return id; }
-  catch (err: any) { return rejectWithValue(err.response?.data?.message || 'Failed to delete'); }
+  catch (err: any) { return rejectWithValue(err.response?.data?.detail || err.response?.data?.message || 'Failed to delete'); }
 });
 
 export const bulkDeleteProducts = createAsyncThunk('products/bulkDelete', async (ids: string[], { rejectWithValue }) => {
   try { await productApi.bulkDelete(ids); return ids; }
-  catch (err: any) { return rejectWithValue(err.response?.data?.message || 'Bulk delete failed'); }
+  catch (err: any) { return rejectWithValue(err.response?.data?.detail || err.response?.data?.message || 'Bulk delete failed'); }
 });
 
 export const bulkStatusUpdate = createAsyncThunk(
   'products/bulkStatus',
   async ({ ids, status }: { ids: string[]; status: 'ACTIVE' | 'INACTIVE' }, { rejectWithValue }) => {
     try { await productApi.bulkStatusUpdate(ids, status); return { ids, status }; }
-    catch (err: any) { return rejectWithValue(err.response?.data?.message || 'Bulk update failed'); }
+    catch (err: any) { return rejectWithValue(err.response?.data?.detail || err.response?.data?.message || 'Bulk update failed'); }
   }
 );
 
@@ -80,6 +103,15 @@ const productSlice = createSlice({
     clearSelected(state) { state.selectedIds = []; },
     setSelected(state, action) { state.selected = action.payload; },
     clearError(state) { state.error = null; },
+    resetFilters(state) {
+      state.filters = {
+        search: '', status: '', category_id: '', stock_filter: '',
+        stock_min: '', stock_max: '', min_price: '', max_price: '',
+        discount_only: false, created_from: '', created_to: '',
+        updated_from: '', updated_to: '', sort_by: 'recent',
+        page: 1, limit: state.filters.limit,
+      };
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -125,5 +157,5 @@ const productSlice = createSlice({
   },
 });
 
-export const { setFilter, setPage, selectId, selectAll, clearSelected, setSelected, clearError } = productSlice.actions;
+export const { setFilter, setPage, selectId, selectAll, clearSelected, setSelected, clearError, resetFilters } = productSlice.actions;
 export default productSlice.reducer;

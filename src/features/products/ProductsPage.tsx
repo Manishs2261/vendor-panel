@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import {
   fetchProducts, fetchCategories, deleteProduct, bulkDeleteProducts,
-  bulkStatusUpdate, setFilter, setPage, selectId, selectAll, clearSelected,
+  bulkStatusUpdate, setFilter, setPage, selectId, selectAll, clearSelected, resetFilters,
 } from './productSlice';
 import DataTable, { Column } from '../../components/common/DataTable';
 import { StatusBadge, Pagination, ConfirmDialog } from '../../components/common';
@@ -132,11 +132,11 @@ const ProductsPage: React.FC = () => {
 
       <div className="card">
         {/* ── Filters ── */}
-        <div className="filters-bar">
+        <div className="filters-bar" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="filter-search">
             <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>🔍</span>
             <input
-              placeholder="Search products..."
+              placeholder="Search name, brand, description, tags..."
               value={filters.search}
               onChange={(e) => dispatch(setFilter({ search: e.target.value }))}
             />
@@ -145,11 +145,115 @@ const ProductsPage: React.FC = () => {
             <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
           </select>
           <select className="form-select" style={{ width: 160 }} value={filters.category_id} onChange={(e) => dispatch(setFilter({ category_id: e.target.value }))}>
             <option value="">All Categories</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <select className="form-select" style={{ width: 160 }} value={filters.stock_filter} onChange={(e) => dispatch(setFilter({ stock_filter: e.target.value }))}>
+            <option value="">All Stock</option>
+            <option value="in_stock">In Stock</option>
+            <option value="low_stock">Low Stock</option>
+            <option value="out_of_stock">Out Of Stock</option>
+            <option value="overstock">Overstock</option>
+          </select>
+          <select className="form-select" style={{ width: 170 }} value={filters.sort_by} onChange={(e) => dispatch(setFilter({ sort_by: e.target.value }))}>
+            <option value="recent">Recently Updated</option>
+            <option value="newest">Newest Created</option>
+            <option value="oldest">Oldest Created</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="stock_asc">Stock: Low to High</option>
+            <option value="stock_desc">Stock: High to Low</option>
+            <option value="name_asc">Name: A to Z</option>
+            <option value="name_desc">Name: Z to A</option>
+          </select>
+          <label className="btn btn-ghost btn-sm" style={{ gap: 8, display: 'inline-flex', alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={filters.discount_only}
+              onChange={(e) => dispatch(setFilter({ discount_only: e.target.checked }))}
+            />
+            Discount Only
+          </label>
+          <button className="btn btn-ghost btn-sm" onClick={() => dispatch(resetFilters())}>
+            Clear Filters
+          </button>
+        </div>
+
+        <div className="filters-bar" style={{ flexWrap: 'wrap', alignItems: 'center', paddingTop: 0 }}>
+          <input
+            className="form-input"
+            style={{ width: 120 }}
+            type="number"
+            min="0"
+            placeholder="Min Price"
+            value={filters.min_price}
+            onChange={(e) => dispatch(setFilter({ min_price: e.target.value }))}
+          />
+          <input
+            className="form-input"
+            style={{ width: 120 }}
+            type="number"
+            min="0"
+            placeholder="Max Price"
+            value={filters.max_price}
+            onChange={(e) => dispatch(setFilter({ max_price: e.target.value }))}
+          />
+          <input
+            className="form-input"
+            style={{ width: 120 }}
+            type="number"
+            min="0"
+            placeholder="Min Stock"
+            value={filters.stock_min}
+            onChange={(e) => dispatch(setFilter({ stock_min: e.target.value }))}
+          />
+          <input
+            className="form-input"
+            style={{ width: 120 }}
+            type="number"
+            min="0"
+            placeholder="Max Stock"
+            value={filters.stock_max}
+            onChange={(e) => dispatch(setFilter({ stock_max: e.target.value }))}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Created</span>
+            <input
+              className="form-input"
+              style={{ width: 150 }}
+              type="date"
+              value={filters.created_from}
+              onChange={(e) => dispatch(setFilter({ created_from: e.target.value }))}
+            />
+            <input
+              className="form-input"
+              style={{ width: 150 }}
+              type="date"
+              value={filters.created_to}
+              onChange={(e) => dispatch(setFilter({ created_to: e.target.value }))}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Updated</span>
+            <input
+              className="form-input"
+              style={{ width: 150 }}
+              type="date"
+              value={filters.updated_from}
+              onChange={(e) => dispatch(setFilter({ updated_from: e.target.value }))}
+            />
+            <input
+              className="form-input"
+              style={{ width: 150 }}
+              type="date"
+              value={filters.updated_to}
+              onChange={(e) => dispatch(setFilter({ updated_to: e.target.value }))}
+            />
+          </div>
           {selectedIds.length > 0 && (
             <>
               <select className="form-select" style={{ width: 160 }} value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
