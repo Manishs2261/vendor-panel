@@ -218,7 +218,9 @@ export const dashboardApi = {
       active_products: number;
       inactive_products: number;
       total_views: number;
-      growth_rate: number;
+      total_orders: number;
+      pending_orders: number;
+      revenue: number;
       recent_products: Product[];
       completion_score: number;
     }>('/vendor/dashboard'),

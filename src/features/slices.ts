@@ -73,7 +73,7 @@ export const fetchDashboard = createAsyncThunk(
       return data;
     } catch (err: any) {
       return rejectWithValue(
-        err.response?.data?.message || "Failed to fetch dashboard",
+        err.response?.data?.detail || err.response?.data?.message || "Failed to fetch dashboard",
       );
     }
   },

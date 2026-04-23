@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
@@ -6,48 +6,39 @@ import { fetchDashboard } from './dashboardSlice';
 import { StatusBadge } from '../../components/common';
 import { vendorApi, type VendorProfileResponse } from '../../api/services';
 
-const CHART_DATA = [
-  { day: 'Mon', views: 120 },
-  { day: 'Tue', views: 210 },
-  { day: 'Wed', views: 180 },
-  { day: 'Thu', views: 340 },
-  { day: 'Fri', views: 290 },
-  { day: 'Sat', views: 420 },
-  { day: 'Sun', views: 380 },
-];
-
-const MOCK = {
-  total_products: 48,
-  active_products: 42,
-  inactive_products: 6,
-  total_views: 8420,
-  growth_rate: 12.4,
-  completion_score: 78,
-  recent_products: [
-    { id: '1', name: 'Classic Silk Saree', category_name: 'Clothing', price: 2499, status: 'ACTIVE', click_count: 142, images: [] },
-    { id: '2', name: 'Cotton Kurta Set', category_name: 'Clothing', price: 899, status: 'ACTIVE', click_count: 98, images: [] },
-    { id: '3', name: 'Gold Bangles', category_name: 'Jewellery', price: 5999, status: 'PENDING', click_count: 67, images: [] },
-    { id: '4', name: 'Embroidered Dupatta', category_name: 'Accessories', price: 349, status: 'INACTIVE', click_count: 23, images: [] },
-  ],
-};
-
-const COMPLETION_STEPS = [
-  { label: 'Shop created', done: true },
-  { label: 'Logo uploaded', done: true },
-  { label: 'Banner added', done: true },
-  { label: 'GST verified', done: false },
-  { label: '5+ products', done: true },
-  { label: 'Phone verified', done: false },
-];
-
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { data } = useAppSelector((s) => s.dashboard);
   const vendor = useAppSelector((s) => s.auth.vendor);
   const [vendorProfile, setVendorProfile] = useState<VendorProfileResponse | null>(null);
-  const stats = data || MOCK;
+  const stats = data || {
+    total_products: 0,
+    active_products: 0,
+    inactive_products: 0,
+    total_views: 0,
+    total_orders: 0,
+    pending_orders: 0,
+    revenue: 0,
+    completion_score: 0,
+    recent_products: [],
+  };
   const score = stats.completion_score;
+  const completionSteps = useMemo(() => [
+    { label: 'Business name added', done: !!vendorProfile?.business_name },
+    { label: 'Business email added', done: !!vendorProfile?.business_email },
+    { label: 'Business phone added', done: !!vendorProfile?.business_phone },
+    { label: 'GST or PAN added', done: !!vendorProfile?.gst_number },
+    { label: '5+ products added', done: stats.total_products >= 5 },
+    { label: 'Vendor approved', done: vendorProfile?.status === 'approved' },
+  ], [vendorProfile, stats.total_products]);
+  const chartData = useMemo(
+    () => (stats.recent_products || []).slice().reverse().map((p: any) => ({
+      day: p.name.length > 10 ? `${p.name.slice(0, 10)}...` : p.name,
+      views: p.click_count ?? 0,
+    })),
+    [stats.recent_products]
+  );
 
   useEffect(() => {
     dispatch(fetchDashboard());
@@ -118,7 +109,7 @@ const DashboardPage: React.FC = () => {
           <div className="completion-title">Shop Profile {score < 100 ? 'Incomplete' : 'Complete'}</div>
           <div className="completion-desc">Complete your profile to rank higher in search results</div>
           <div className="completion-steps">
-            {COMPLETION_STEPS.map((step) => (
+            {completionSteps.map((step) => (
               <div key={step.label} className={`completion-step ${step.done ? 'done' : 'todo'}`}>
                 <span>{step.done ? 'OK' : 'O'}</span>
                 <span>{step.label}</span>
@@ -133,11 +124,11 @@ const DashboardPage: React.FC = () => {
 
       <div className="stats-grid">
         {[
-          { label: 'Total Products', value: stats.total_products, icon: 'P', color: 'indigo', trend: '+3 this week', up: true },
-          { label: 'Active Products', value: stats.active_products, icon: 'A', color: 'green', trend: '87.5% of total', up: true },
-          { label: 'Inactive', value: stats.inactive_products, icon: 'I', color: 'yellow', trend: 'Need attention', up: false },
-          { label: 'Total Views', value: stats.total_views.toLocaleString(), icon: 'V', color: 'cyan', trend: `+${stats.growth_rate}%`, up: true },
-          { label: 'Growth Rate', value: `${stats.growth_rate}%`, icon: 'G', color: 'purple', trend: 'vs last month', up: true },
+          { label: 'Total Products', value: stats.total_products, icon: 'P', color: 'indigo', trend: `${stats.recent_products.length} recent items`, up: true },
+          { label: 'Active Products', value: stats.active_products, icon: 'A', color: 'green', trend: `${stats.total_products ? Math.round((stats.active_products / stats.total_products) * 100) : 0}% of total`, up: true },
+          { label: 'Need Attention', value: stats.inactive_products, icon: 'I', color: 'yellow', trend: 'Inactive, pending, or rejected', up: false },
+          { label: 'Total Views', value: stats.total_views.toLocaleString(), icon: 'V', color: 'cyan', trend: `${stats.pending_orders} pending orders`, up: true },
+          { label: 'Revenue', value: `Rs ${Number(stats.revenue || 0).toLocaleString()}`, icon: 'R', color: 'purple', trend: `${stats.total_orders} total orders`, up: true },
         ].map((s) => (
           <div key={s.label} className="stat-card">
             <div className="stat-card-top">
@@ -154,12 +145,12 @@ const DashboardPage: React.FC = () => {
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">Views This Week</div>
-              <div className="card-sub">Daily product views trend</div>
+              <div className="card-title">Recent Product Views</div>
+              <div className="card-sub">Latest products and their current click counts</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={CHART_DATA}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="viewGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
@@ -219,18 +210,18 @@ const DashboardPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {MOCK.recent_products.map((p) => (
+              {stats.recent_products.map((p: any) => (
                 <tr key={p.id} onClick={() => navigate(`/products/${p.id}/edit`)} style={{ cursor: 'pointer' }}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div className="product-img" style={{ background: 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
-                        P
+                        {p.images?.[0] ? <img src={p.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : 'P'}
                       </div>
                       <span className="product-name">{p.name}</span>
                     </div>
                   </td>
                   <td style={{ color: 'var(--text-muted)' }}>{p.category_name}</td>
-                  <td>Rs {p.price.toLocaleString()}</td>
+                  <td>Rs {Number(p.price || 0).toLocaleString()}</td>
                   <td><StatusBadge status={p.status} /></td>
                   <td>{p.click_count}</td>
                 </tr>
