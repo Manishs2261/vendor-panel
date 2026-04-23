@@ -53,11 +53,7 @@ export const authApi = {
   verifyPhoneOtp: (phone: string, otp: string) =>
     apiClient.post('/auth/otp/phone/verify', { phone, otp }),
 
-  googleLogin: (firebase_token: string) =>
-    apiClient.post<{ access_token: string; refresh_token: string; user: Vendor }>(
-      '/auth/google/vendor', { firebase_token }
-    ),
-
+  
   forgotPassword: (email: string) =>
     apiClient.post('/auth/forgot-password', { email }),
 

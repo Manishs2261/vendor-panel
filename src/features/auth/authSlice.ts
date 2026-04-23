@@ -1,7 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { authApi } from '../../api/services';
-import { auth, googleProvider } from '../../utils/firebase';
-import { signInWithPopup } from 'firebase/auth';
 import type { Vendor } from '../../types';
 
 interface AuthState {
@@ -70,21 +68,6 @@ export const registerThunk = createAsyncThunk(
   }
 );
 
-export const googleLoginThunk = createAsyncThunk(
-  'auth/googleLogin',
-  async (_, { rejectWithValue }) => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const firebase_token = await result.user.getIdToken();
-      const { data } = await authApi.googleLogin(firebase_token);
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('refresh_token', data.refresh_token);
-      return data.user;
-    } catch (err: any) {
-      return rejectWithValue(getApiErrorMessage(err, 'Google login failed'));
-    }
-  }
-);
 
 export const verifyEmailOtpThunk = createAsyncThunk(
   'auth/verifyEmailOtp',
@@ -130,9 +113,6 @@ const authSlice = createSlice({
       .addCase(loginThunk.fulfilled, (state, action) => { state.loading = false; state.vendor = action.payload; })
       .addCase(loginThunk.rejected, rejected)
 
-      .addCase(googleLoginThunk.pending, pending)
-      .addCase(googleLoginThunk.fulfilled, (state, action) => { state.loading = false; state.vendor = action.payload; })
-      .addCase(googleLoginThunk.rejected, rejected)
 
       .addCase(verifyEmailOtpThunk.pending, pending)
       .addCase(verifyEmailOtpThunk.fulfilled, (state, action) => { state.loading = false; state.vendor = action.payload; state.otpStep = 'verified'; })
