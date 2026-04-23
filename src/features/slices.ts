@@ -27,7 +27,7 @@ export const fetchAnalytics = createAsyncThunk(
       return data;
     } catch (err: any) {
       return rejectWithValue(
-        err.response?.data?.message || "Failed to fetch analytics",
+        err.response?.data?.detail || err.response?.data?.message || "Failed to fetch analytics",
       );
     }
   },
