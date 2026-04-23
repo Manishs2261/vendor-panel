@@ -221,3 +221,77 @@ export const dashboardApi = {
       completion_score: number;
     }>('/vendor/dashboard'),
 };
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+export const publicApi = {
+  getVendorPublicProfile: (vendorId: string) =>
+    apiClient.get<{
+      vendor: {
+        id: string;
+        business_name: string;
+        business_email?: string;
+        business_phone?: string;
+        gst_number?: string;
+        status: string;
+        verified: boolean;
+      };
+      shop: {
+        id: string;
+        name: string;
+        description: string;
+        logo_url?: string;
+        banner_url?: string;
+        gallery: string[];
+        address: string;
+        city: string;
+        state: string;
+        postal_code: string;
+        contact_phone: string;
+        contact_email: string;
+      } | null;
+      products: Array<{
+        id: string;
+        name: string;
+        description: string;
+        price: number;
+        discount_percentage: number;
+        discounted_price: number;
+        category_name: string;
+        images: string[];
+        status: string;
+        stock: number;
+      }>;
+    }>(`/public/vendor/${vendorId}`),
+
+  getVendorsShowcase: () =>
+    apiClient.get<{
+      vendors: Array<{
+        vendor_id: string;
+        business_name: string;
+        owner_name: string;
+        description: string;
+        address: string;
+        contact_phone: string;
+        contact_email: string;
+        status: string;
+        verified: boolean;
+        joined_at: string;
+        banner_url?: string;
+        logo_url?: string;
+        total_products: number;
+        products: Array<{
+          id: string;
+          name: string;
+          description: string;
+          price: number;
+          discount_percentage: number;
+          discounted_price: number;
+          category_name: string;
+          images: string[];
+          status: string;
+          stock: number;
+        }>;
+      }>;
+      total_vendors: number;
+    }>('/public/showcase'),
+};

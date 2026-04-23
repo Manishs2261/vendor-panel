@@ -196,6 +196,7 @@ const DashboardPage: React.FC = () => {
               { icon: '+', label: 'Add New Product', to: '/products/new' },
               { icon: 'A', label: 'View Analytics', to: '/analytics' },
               { icon: 'S', label: 'Edit Shop Profile', to: '/shop' },
+              { icon: '🌐', label: 'View Public Storefront', to: `/vendor/${vendor?.id}` },
               { icon: 'M', label: 'Check Payments', to: '/payments' },
             ].map((action) => (
               <button

@@ -13,6 +13,12 @@ const NAV = [
     ],
   },
   {
+    group: 'Marketplace',
+    items: [
+      { to: '/showcase', icon: '🏪', label: 'Marketplace' },
+    ],
+  },
+  {
     group: 'Account',
     items: [
       { to: '/shop', icon: 'S', label: 'Shop Profile' },
@@ -28,6 +34,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/products': { title: 'Products', sub: 'Manage your product catalog' },
   '/products/new': { title: 'Add Product', sub: 'Create a new product listing' },
   '/analytics': { title: 'Analytics', sub: 'Views, searches and trends' },
+  '/showcase': { title: 'Marketplace', sub: 'Browse all vendors and products' },
   '/shop': { title: 'Shop Profile', sub: 'Your shop details and gallery' },
   '/payments': { title: 'Payments', sub: 'Payouts and commission history' },
   '/notifications': { title: 'Notifications', sub: 'Push notification history' },

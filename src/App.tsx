@@ -15,6 +15,8 @@ import ShopPage from './features/shop/ShopPage';
 import { PaymentsPage } from './features/payments/PaymentsPage';
 import NotificationsPage from './features/notifications/NotificationsPage';
 import SettingsPage from './features/settings/SettingsPage';
+import PublicVendorPage from './features/public/PublicVendorPage';
+import ShowcasePage from './features/public/ShowcasePage';
 import { useAppDispatch } from './hooks/redux';
 import './styles/global.css';
 
@@ -35,6 +37,8 @@ const App: React.FC = () => (
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/showcase" element={<ShowcasePage />} />
+          <Route path="/vendor/:vendorId" element={<PublicVendorPage />} />
 
           {/* Protected */}
           <Route element={<ProtectedRoute />}>
