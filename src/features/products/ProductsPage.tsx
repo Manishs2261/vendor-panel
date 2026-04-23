@@ -19,6 +19,19 @@ const ProductsPage: React.FC = () => {
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const formatDateTime = (value?: string) => {
+    if (!value) return 'Never';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Invalid date';
+    return new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  };
+
   useEffect(() => {
     dispatch(fetchProducts());
     dispatch(fetchCategories());
@@ -83,6 +96,14 @@ const ProductsPage: React.FC = () => {
     },
     { key: 'stock', label: 'Stock', render: (v) => <span style={{ color: v < 5 ? 'var(--red)' : 'var(--text)' }}>{v}</span> },
     { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
+    {
+      key: 'updated_at', label: 'Last Updated',
+      render: (v, row) => (
+        <div style={{ color: 'var(--text-muted)', fontSize: 12.5, lineHeight: 1.35 }}>
+          {formatDateTime(v || row.created_at)}
+        </div>
+      ),
+    },
     { key: 'click_count', label: 'Clicks', render: (v) => <span style={{ color: 'var(--text-muted)' }}>{v ?? 0}</span> },
     { key: 'search_count', label: 'Searches', render: (v) => <span style={{ color: 'var(--text-muted)' }}>{v ?? 0}</span> },
     {
