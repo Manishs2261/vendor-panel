@@ -4,7 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { fetchDashboard } from './dashboardSlice';
 import { StatusBadge } from '../../components/common';
-import { vendorApi, type VendorProfileResponse } from '../../api/services';
+import { vendorApi, shopApi, type VendorProfileResponse } from '../../api/services';
 
 const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -12,6 +12,7 @@ const DashboardPage: React.FC = () => {
   const { data } = useAppSelector((s) => s.dashboard);
   const vendor = useAppSelector((s) => s.auth.vendor);
   const [vendorProfile, setVendorProfile] = useState<VendorProfileResponse | null>(null);
+  const [shop, setShop] = useState<any>(null);
   const stats = data || {
     total_products: 0,
     active_products: 0,
@@ -23,15 +24,21 @@ const DashboardPage: React.FC = () => {
     completion_score: 0,
     recent_products: [],
   };
-  const score = stats.completion_score;
   const completionSteps = useMemo(() => [
     { label: 'Business name added', done: !!vendorProfile?.business_name },
     { label: 'Business email added', done: !!vendorProfile?.business_email },
     { label: 'Business phone added', done: !!vendorProfile?.business_phone },
     { label: 'GST or PAN added', done: !!vendorProfile?.gst_number },
+    { label: 'Shop name added', done: !!shop?.name },
+    { label: 'Shop logo added', done: !!shop?.logo_url },
+    { label: 'Shop address added', done: !!shop?.address },
+    { label: 'Email verified', done: vendor?.is_email_verified || false },
+    { label: 'Phone verified', done: vendor?.is_phone_verified || false },
     { label: '5+ products added', done: stats.total_products >= 5 },
-    { label: 'Vendor approved', done: vendorProfile?.status === 'approved' },
-  ], [vendorProfile, stats.total_products]);
+  ], [vendorProfile, shop, stats.total_products, vendor]);
+  
+  // Calculate score based on completion steps to match frontend calculation
+  const score = Math.round((completionSteps.filter(step => step.done).length / completionSteps.length) * 100);
   const chartData = useMemo(
     () => (stats.recent_products || []).slice().reverse().map((p: any) => ({
       day: p.name.length > 10 ? `${p.name.slice(0, 10)}...` : p.name,
@@ -46,13 +53,27 @@ const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
-    vendorApi.me()
-      .then(({ data: profile }) => {
-        if (mounted) setVendorProfile(profile);
-      })
-      .catch(() => {
-        if (mounted) setVendorProfile(null);
-      });
+    const fetchData = async () => {
+      try {
+        const [profileResponse, shopResponse] = await Promise.all([
+          vendorApi.me(),
+          shopApi.getMyShop().catch(() => null) // Don't fail if shop doesn't exist
+        ]);
+        
+        if (mounted) {
+          setVendorProfile(profileResponse.data);
+          setShop(shopResponse?.data || null);
+        }
+      } catch (err) {
+        if (mounted) {
+          setVendorProfile(null);
+          setShop(null);
+        }
+      }
+    };
+    
+    fetchData();
+    
     return () => {
       mounted = false;
     };

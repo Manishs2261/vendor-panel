@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery } from './shopSlice';
+import { vendorApi, shopApi, productApi, dashboardApi, type VendorProfileResponse } from '../../api/services';
 import type { ShopForm } from '../../types';
 import toast from 'react-hot-toast';
 
@@ -38,12 +39,28 @@ const ShopPage: React.FC = () => {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+  const [vendorProfile, setVendorProfile] = useState<VendorProfileResponse | null>(null);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
   const logoRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     dispatch(fetchMyShop());
+    // Fetch vendor profile and dashboard stats for consistent completion calculation
+    Promise.all([
+      vendorApi.me().then(({ data }) => data).catch(() => null),
+      dashboardApi.getOverview().then(({ data }) => data).catch(() => null)
+    ]).then(([profile, dashboardData]) => {
+      setVendorProfile(profile);
+      setDashboardStats(dashboardData);
+      setTotalProducts(dashboardData?.total_products || 0);
+    }).catch(() => {
+      setVendorProfile(null);
+      setDashboardStats(null);
+      setTotalProducts(0);
+    });
   }, [dispatch]);
 
   useEffect(() => {
@@ -58,7 +75,7 @@ const ShopPage: React.FC = () => {
     }
   }, [shop]);
 
-  const set = (key: keyof ShopForm, value: any) => setForm((f) => ({ ...f, [key]: value }));
+  const set = (key: keyof ShopForm, value: any) => setForm((f: ShopForm) => ({ ...f, [key]: value }));
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,18 +149,22 @@ const ShopPage: React.FC = () => {
     }
   };
 
-  const completionSteps = shop ? [
-    { label: 'Shop name', done: !!shop.name },
-    { label: 'Description', done: !!shop.description },
-    { label: 'Logo', done: !!shop.logo_url },
-    { label: 'Banner', done: !!shop.banner_url },
-    { label: 'Gallery', done: (shop.gallery && shop.gallery.length > 0) },
-    { label: 'GST number', done: !!shop.gst_number },
-    { label: 'Phone verified', done: !!shop.contact_phone },
-    { label: 'Email verified', done: !!shop.contact_email },
-  ] : [];
+  const vendor = useAppSelector((s) => s.auth.vendor);
+  
+  const completionSteps = useMemo(() => [
+    { label: 'Business name added', done: !!vendorProfile?.business_name },
+    { label: 'Business email added', done: !!vendorProfile?.business_email },
+    { label: 'Business phone added', done: !!vendorProfile?.business_phone },
+    { label: 'GST or PAN added', done: !!vendorProfile?.gst_number },
+    { label: 'Shop name added', done: !!shop?.name },
+    { label: 'Shop logo added', done: !!shop?.logo_url },
+    { label: 'Shop address added', done: !!shop?.address },
+    { label: 'Email verified', done: vendor?.is_email_verified || false },
+    { label: 'Phone verified', done: vendor?.is_phone_verified || false },
+    { label: '5+ products added', done: (dashboardStats?.total_products || 0) >= 5 },
+  ], [vendorProfile, shop, dashboardStats, vendor]);
 
-  const score = completionSteps.length > 0 ? Math.round((completionSteps.filter((s) => s.done).length / completionSteps.length) * 100) : 0;
+  const score = Math.round((completionSteps.filter(step => step.done).length / completionSteps.length) * 100);
 
   return (
     <form onSubmit={handleSave}>
