@@ -3,6 +3,31 @@ import { useParams, Link } from 'react-router-dom';
 import { publicApi } from '../../api/services';
 import toast from 'react-hot-toast';
 
+interface MarketplaceSettings {
+  theme?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  background_color?: string;
+  banner_text?: string;
+  banner_subtext?: string;
+  show_banner?: boolean;
+  show_vendor_info?: boolean;
+  show_contact_info?: boolean;
+  show_ratings?: boolean;
+  products_per_page?: number;
+  custom_css?: string;
+  facebook_url?: string;
+  instagram_url?: string;
+  twitter_url?: string;
+  whatsapp_number?: string;
+  enable_reviews?: boolean;
+  enable_wishlist?: boolean;
+  enable_sharing?: boolean;
+  meta_title?: string;
+  meta_description?: string;
+  meta_keywords?: string;
+}
+
 interface PublicVendorData {
   vendor: {
     id: string;
@@ -46,6 +71,7 @@ const PublicVendorPage: React.FC = () => {
   const [data, setData] = useState<PublicVendorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
 
   useEffect(() => {
     if (!vendorId) {
@@ -57,12 +83,20 @@ const PublicVendorPage: React.FC = () => {
     const fetchVendorData = async () => {
       try {
         setLoading(true);
-        const response = await publicApi.getVendorPublicProfile(vendorId);
-        setData(response.data);
+        
+        // Fetch vendor profile and marketplace settings in parallel
+        const [vendorResponse, settingsResponse] = await Promise.all([
+          publicApi.getVendorPublicProfile(vendorId),
+          publicApi.getVendorMarketplaceSettings(vendorId)
+        ]);
+        
+        setData(vendorResponse.data);
+        setMarketplaceSettings(settingsResponse.data);
         setError(null);
       } catch (err: any) {
         setError(err.response?.data?.detail || 'Failed to load vendor profile');
         setData(null);
+        setMarketplaceSettings(null);
       } finally {
         setLoading(false);
       }

@@ -7,16 +7,16 @@ import { fetchMeThunk } from './features/auth/authSlice';
 import { ProtectedRoute } from './components/common';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './features/auth/LoginPage';
-import DashboardPage from './features/dashboard/DashboardPage';
 import ProductsPage from './features/products/ProductsPage';
 import ProductFormPage from './features/products/ProductFormPage';
-import AnalyticsPage from './features/analytics/AnalyticsPage';
+import MarketplaceSettingsPage from './features/marketplace/MarketplaceSettingsPage';
 import ShopPage from './features/shop/ShopPage';
 import { PaymentsPage } from './features/payments/PaymentsPage';
 import NotificationsPage from './features/notifications/NotificationsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import PublicVendorPage from './features/public/PublicVendorPage';
 import ShowcasePage from './features/public/ShowcasePage';
+import AnalyticsPage from './features/analytics/AnalyticsPage';
 import { useAppDispatch } from './hooks/redux';
 import './styles/global.css';
 
@@ -43,12 +43,13 @@ const App: React.FC = () => (
           {/* Protected */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<AnalyticsPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/products/new" element={<ProductFormPage />} />
               <Route path="/products/:id/edit" element={<ProductFormPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/shop" element={<ShopPage />} />
+              <Route path="/marketplace-settings" element={<MarketplaceSettingsPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />

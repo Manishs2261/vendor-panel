@@ -22,6 +22,7 @@ const NAV = [
     group: 'Account',
     items: [
       { to: '/shop', icon: 'S', label: 'Shop Profile' },
+      { to: '/marketplace-settings', icon: '🎨', label: 'Marketplace' },
       { to: '/payments', icon: 'M', label: 'Payments' },
       { to: '/notifications', icon: 'N', label: 'Notifications', badge: 'unread' },
       { to: '/settings', icon: 'T', label: 'Settings' },
@@ -36,6 +37,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/analytics': { title: 'Analytics', sub: 'Views, searches and trends' },
   '/showcase': { title: 'Marketplace', sub: 'Browse all vendors and products' },
   '/shop': { title: 'Shop Profile', sub: 'Your shop details and gallery' },
+  '/marketplace-settings': { title: 'Marketplace Settings', sub: 'Customize your storefront appearance' },
   '/payments': { title: 'Payments', sub: 'Payouts and commission history' },
   '/notifications': { title: 'Notifications', sub: 'Push notification history' },
   '/settings': { title: 'Settings', sub: 'Account access and session controls' },
