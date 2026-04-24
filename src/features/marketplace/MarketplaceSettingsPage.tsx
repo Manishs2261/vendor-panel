@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { analyticsApi } from '../../api/services';
+import { analyticsApi, authApi } from '../../api/services';
 import toast from 'react-hot-toast';
-import { useAppSelector } from '../../hooks/redux';
+import { useAppSelector, useAppDispatch } from '../../hooks/redux';
+import { fetchMeThunk } from '../auth/authSlice';
 
 interface MarketplaceSettings {
   id?: number;
@@ -59,27 +60,118 @@ const MarketplaceSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('appearance');
+  const [error, setError] = useState<string | null>(null);
   
   // Get vendor data from Redux store
   const vendor = useAppSelector((state) => state.auth.vendor);
+  const dispatch = useAppDispatch();
+  const [checkedVendor, setCheckedVendor] = useState(false);
 
+  // Check if vendor profile exists and try to fetch if not
   useEffect(() => {
-    loadSettings();
-  }, []);
+    const checkVendorProfile = async () => {
+      if (!vendor && !checkedVendor) {
+        try {
+          await dispatch(fetchMeThunk()).unwrap();
+        } catch (error) {
+          console.error('Failed to fetch vendor profile:', error);
+        } finally {
+          setCheckedVendor(true);
+        }
+      } else if (vendor) {
+        setCheckedVendor(true);
+      }
+    };
 
-  const loadSettings = async () => {
+    checkVendorProfile();
+  }, [vendor, dispatch, checkedVendor]);
+
+  // Load settings when vendor is available
+  useEffect(() => {
+    if (vendor) {
+      loadSettings();
+    }
+  }, [vendor]);
+
+  // Check if vendor profile exists
+  if (!checkedVendor) {
+    return (
+      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '48px',
+          border: '1px solid #ede8df',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #f3f3f3',
+            borderTopColor: '#c8a96e',
+            borderRadius: '50%',
+            margin: '0 auto 20px',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <p style={{ color: '#6b5c45', fontSize: '16px' }}>
+            Checking vendor profile...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!vendor) {
+    return (
+      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          padding: '48px',
+          border: '1px solid #ede8df',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+          <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#1a1208', marginBottom: '12px' }}>
+            Vendor Profile Required
+          </h2>
+          <p style={{ color: '#6b5c45', fontSize: '16px', marginBottom: '24px' }}>
+            You need to complete your vendor registration to access marketplace settings.
+          </p>
+          <p style={{ color: '#6b5c45', fontSize: '14px' }}>
+            Please contact support or complete your vendor profile setup.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  async function loadSettings() {
     try {
       setLoading(true);
       const response = await analyticsApi.getMarketplaceSettings();
-      if (response.data) {
-        setSettings(response.data);
-      }
+      setSettings(response.data);
+      setError(null);
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to load settings');
+      console.error('Load settings error:', error);
+      const errorMessage = error.response?.data?.detail ||
+                          error.response?.data?.message ||
+                          error.message ||
+                          'Failed to load settings';
+
+      // Check if it's a vendor profile issue
+      if (errorMessage.includes('Vendor') && errorMessage.includes('not found')) {
+        toast.error('Your vendor profile is not set up yet. Please complete your registration or contact support.');
+        setLoading(false);
+        return;
+      }
+
+      toast.error(`Error loading settings: ${errorMessage}`);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const saveSettings = async () => {
     try {
@@ -87,9 +179,41 @@ const MarketplaceSettingsPage: React.FC = () => {
       await analyticsApi.updateMarketplaceSettings(settings);
       toast.success('Marketplace settings saved successfully!');
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to save settings');
+      console.error('Save settings error:', error);
+      const errorMessage = error.response?.data?.detail ||
+                          error.response?.data?.message ||
+                          error.message ||
+                          'Failed to save settings';
+      toast.error(`Error saving settings: ${errorMessage}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const previewStore = async () => {
+    if (!vendor?.id) {
+      toast.error('Vendor information not available. Please refresh the page.');
+      return;
+    }
+
+    try {
+      const previewKey = `marketplace-preview-${vendor.id}-${Date.now()}`;
+      localStorage.setItem(
+        previewKey,
+        JSON.stringify({
+          vendorId: String(vendor.id),
+          settings,
+          createdAt: Date.now(),
+        })
+      );
+
+      const storeUrl = `${window.location.origin}/vendor/${vendor.id}?preview=${encodeURIComponent(previewKey)}`;
+      window.open(storeUrl, '_blank');
+      toast.success('Opening preview with your unsaved changes...');
+    } catch (error: any) {
+      console.error('Preview error:', error);
+      const errorMessage = error.message || 'Failed to open store preview';
+      toast.error(`Error: ${errorMessage}`);
     }
   };
 
@@ -103,7 +227,12 @@ const MarketplaceSettingsPage: React.FC = () => {
           toast.success('Settings reset to default successfully!');
         }
       } catch (error: any) {
-        toast.error(error.response?.data?.detail || 'Failed to reset settings');
+        console.error('Reset settings error:', error);
+        const errorMessage = error.response?.data?.detail ||
+                            error.response?.data?.message ||
+                            error.message ||
+                            'Failed to reset settings';
+        toast.error(`Error resetting settings: ${errorMessage}`);
       } finally {
         setSaving(false);
       }
@@ -138,37 +267,81 @@ const MarketplaceSettingsPage: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1a1208', marginBottom: '8px' }}>
-          Marketplace Settings
-        </h1>
-        <p style={{ color: '#6b5c45', fontSize: '16px' }}>
+      <div style={{
+        marginBottom: '32px',
+        background: 'linear-gradient(135deg, #c8a96e 0%, #d4b896 100%)',
+        borderRadius: '12px',
+        padding: '32px',
+        boxShadow: '0 4px 12px rgba(200, 169, 110, 0.15)',
+        border: '1px solid rgba(200, 169, 110, 0.3)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            background: 'rgba(255, 255, 255, 0.3)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px'
+          }}>
+            ⚙️
+          </div>
+          <div>
+            <h1 style={{ fontSize: '32px', fontWeight: '700', color: 'white', marginBottom: '4px' }}>
+              Marketplace Settings
+            </h1>
+          </div>
+        </div>
+        <p style={{ color: 'rgba(255, 255, 255, 0.95)', fontSize: '16px', marginLeft: '64px' }}>
           Customize your vendor storefront appearance and functionality
         </p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #ede8df', marginBottom: '32px' }}>
+      <div style={{
+        display: 'flex',
+        background: 'white',
+        borderRadius: '12px 12px 0 0',
+        border: '1px solid #ede8df',
+        borderBottom: 'none',
+        marginBottom: '0',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+      }}>
         {[
           { id: 'appearance', label: 'Appearance' },
           { id: 'layout', label: 'Layout' },
           { id: 'social', label: 'Social Media' },
           { id: 'seo', label: 'SEO' },
           { id: 'advanced', label: 'Advanced' }
-        ].map(tab => (
+        ].map((tab, index) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: '12px 24px',
+              flex: 1,
+              padding: '16px 20px',
               border: 'none',
-              background: 'transparent',
-              color: activeTab === tab.id ? '#1a1208' : '#6b5c45',
-              borderBottom: activeTab === tab.id ? '2px solid #c8a96e' : '2px solid transparent',
+              background: activeTab === tab.id ? 'rgba(200, 169, 110, 0.1)' : 'transparent',
+              color: activeTab === tab.id ? '#c8a96e' : '#6b5c45',
+              borderBottom: activeTab === tab.id ? '3px solid #c8a96e' : '3px solid transparent',
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: activeTab === tab.id ? '600' : '400',
-              transition: 'all 0.2s'
+              fontSize: '15px',
+              fontWeight: activeTab === tab.id ? '600' : '500',
+              transition: 'all 0.3s',
+              borderRight: index < 4 ? '1px solid #ede8df' : 'none',
+              position: 'relative'
+            }}
+            onMouseEnter={(e) => {
+              if (activeTab !== tab.id) {
+                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200, 169, 110, 0.05)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== tab.id) {
+                (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+              }
             }}
           >
             {tab.label}
@@ -177,7 +350,15 @@ const MarketplaceSettingsPage: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div style={{ background: 'white', borderRadius: '12px', padding: '32px', border: '1px solid #ede8df' }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '0 0 12px 12px',
+        padding: '32px',
+        border: '1px solid #ede8df',
+        borderTop: '1px solid #ede8df',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+        marginBottom: '32px'
+      }}>
         
         {/* Appearance Tab */}
         {activeTab === 'appearance' && (
@@ -656,7 +837,8 @@ const MarketplaceSettingsPage: React.FC = () => {
         
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
-            onClick={() => vendor && window.open(`/vendor/${vendor.id}`, '_blank')}
+            onClick={previewStore}
+            disabled={saving}
             style={{
               padding: '10px 20px',
               border: '1px solid #c8a96e',
@@ -665,10 +847,13 @@ const MarketplaceSettingsPage: React.FC = () => {
               borderRadius: '8px',
               fontSize: '14px',
               fontWeight: '500',
-              cursor: 'pointer'
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+              transition: 'all 0.2s'
             }}
+            title="Saves settings and opens your store preview"
           >
-            Preview Store
+            👁️ Preview Store
           </button>
           
           <button
@@ -683,7 +868,8 @@ const MarketplaceSettingsPage: React.FC = () => {
               fontSize: '14px',
               fontWeight: '500',
               cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.8 : 1
+              opacity: saving ? 0.8 : 1,
+              transition: 'all 0.2s'
             }}
           >
             {saving ? 'Saving...' : 'Save Settings'}
