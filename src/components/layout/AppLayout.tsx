@@ -3,6 +3,10 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logout } from '../../features/auth/authSlice';
 
+const APP_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+const MARKETPLACE_URL = `${APP_BASE_URL}/marketplace`;
+const MARKETPLACE_SETTINGS_URL = `${APP_BASE_URL}/settings/marketplace`;
+
 const NAV = [
   {
     group: 'Main',
@@ -10,22 +14,17 @@ const NAV = [
       { to: '/dashboard', icon: 'D', label: 'Dashboard' },
       { to: '/products', icon: 'P', label: 'Products' },
       { to: '/analytics', icon: 'A', label: 'Analytics' },
-    ],
-  },
-  {
-    group: 'Marketplace',
-    items: [
-      { to: '/showcase', icon: '🏪', label: 'Marketplace' },
+      { to: MARKETPLACE_URL, icon: 'M', label: 'Marketplace', external: true },
     ],
   },
   {
     group: 'Account',
     items: [
       { to: '/shop', icon: 'S', label: 'Shop Profile' },
-      { to: '/marketplace-settings', icon: '🎨', label: 'Marketplace' },
       { to: '/payments', icon: 'M', label: 'Payments' },
       { to: '/notifications', icon: 'N', label: 'Notifications', badge: 'unread' },
       { to: '/settings', icon: 'T', label: 'Settings' },
+      { to: MARKETPLACE_SETTINGS_URL, icon: 'U', label: 'Marketplace Settings', external: 'session' },
     ],
   },
 ];
@@ -35,9 +34,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/products': { title: 'Products', sub: 'Manage your product catalog' },
   '/products/new': { title: 'Add Product', sub: 'Create a new product listing' },
   '/analytics': { title: 'Analytics', sub: 'Views, searches and trends' },
-  '/showcase': { title: 'Marketplace', sub: 'Browse all vendors and products' },
   '/shop': { title: 'Shop Profile', sub: 'Your shop details and gallery' },
-  '/marketplace-settings': { title: 'Marketplace Settings', sub: 'Customize your storefront appearance' },
   '/payments': { title: 'Payments', sub: 'Payouts and commission history' },
   '/notifications': { title: 'Notifications', sub: 'Push notification history' },
   '/settings': { title: 'Settings', sub: 'Account access and session controls' },
@@ -54,6 +51,14 @@ const AppLayout: React.FC = () => {
   const handleLogout = () => {
     dispatch(logout());
     navigate('/login');
+  };
+
+  const buildExternalHref = (item: { to: string; external?: boolean | string }) => {
+    if (item.external === 'session') {
+      const token = localStorage.getItem('access_token');
+      if (token) return `${item.to}?token=${encodeURIComponent(token)}`;
+    }
+    return item.to;
   };
 
   return (
@@ -74,17 +79,30 @@ const AppLayout: React.FC = () => {
             <div key={group.group} className="nav-group">
               <div className="nav-group-label">{group.group}</div>
               {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
-                  {item.badge === 'unread' && unreadCount > 0 && (
-                    <span className="nav-badge">{unreadCount}</span>
-                  )}
-                </NavLink>
+                item.external ? (
+                  <a
+                    key={item.label}
+                    href={buildExternalHref(item)}
+                    className="nav-link"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </a>
+                ) : (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span>{item.label}</span>
+                    {item.badge === 'unread' && unreadCount > 0 && (
+                      <span className="nav-badge">{unreadCount}</span>
+                    )}
+                  </NavLink>
+                )
               ))}
             </div>
           ))}

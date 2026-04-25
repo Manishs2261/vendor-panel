@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { publicApi } from '../../api/services';
 
 interface MarketplaceSettings {
@@ -34,6 +34,7 @@ interface PublicVendorData {
     business_email?: string;
     business_phone?: string;
     gst_number?: string;
+    pan_number?: string;
     status: string;
     verified: boolean;
   };
@@ -50,6 +51,9 @@ interface PublicVendorData {
     postal_code: string;
     contact_phone: string;
     contact_email: string;
+    opening_time?: string;
+    closing_time?: string;
+    working_days?: string[];
   } | null;
   products: Array<{
     id: string;
@@ -62,6 +66,8 @@ interface PublicVendorData {
     images: string[];
     status: string;
     stock: number;
+    rating?: number;
+    review_count?: number;
   }>;
 }
 
@@ -72,27 +78,17 @@ const PublicVendorPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
-  const [viewportWidth, setViewportWidth] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 1280
-  );
+  const [currentSlide, setCurrentSlide] = useState(0);
 
   const previewSettings = useMemo(() => {
     const previewKey = new URLSearchParams(location.search).get('preview');
-    if (!previewKey) {
-      return null;
-    }
+    if (!previewKey) return null;
 
     try {
       const rawPreview = localStorage.getItem(previewKey);
-      if (!rawPreview) {
-        return null;
-      }
-
+      if (!rawPreview) return null;
       const parsedPreview = JSON.parse(rawPreview);
-      if (String(parsedPreview.vendorId) !== String(vendorId)) {
-        return null;
-      }
-
+      if (String(parsedPreview.vendorId) !== String(vendorId)) return null;
       return parsedPreview.settings as MarketplaceSettings;
     } catch (previewError) {
       console.error('Failed to read preview settings:', previewError);
@@ -136,662 +132,384 @@ const PublicVendorPage: React.FC = () => {
   }, [vendorId]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    const timer = window.setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % 3);
+    }, 4000);
 
-    const handleResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => window.clearInterval(timer);
   }, []);
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          fontSize: 18,
-          color: '#666',
-          fontFamily: "'DM Sans', sans-serif",
-        }}
-      >
-        Loading storefront preview...
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: "'DM Sans', sans-serif", color: '#6b5c45' }}>
+        Loading storefront...
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          fontSize: 18,
-          color: '#666',
-          textAlign: 'center',
-          padding: 20,
-          fontFamily: "'DM Sans', sans-serif",
-        }}
-      >
-        <div style={{ fontSize: 48, marginBottom: 16 }}>Store</div>
-        <div style={{ marginBottom: 8 }}>Vendor Profile Not Found</div>
-        <div style={{ fontSize: 14, marginBottom: 24 }}>{error}</div>
-        <Link
-          to="/"
-          style={{
-            padding: '12px 24px',
-            background: '#007bff',
-            color: 'white',
-            textDecoration: 'none',
-            borderRadius: 6,
-            fontSize: 14,
-          }}
-        >
-          Go to Homepage
-        </Link>
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ maxWidth: 420, width: '100%', background: 'white', borderRadius: 24, padding: 28, textAlign: 'center', boxShadow: '0 24px 80px rgba(25,18,8,0.10)' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>Store</div>
+          <h1 style={{ margin: 0, fontSize: 24, color: '#1a1208' }}>Vendor Profile Not Found</h1>
+          <p style={{ color: '#6b5c45', margin: '12px 0 20px' }}>{error}</p>
+          <Link to="/" style={{ display: 'inline-block', padding: '12px 20px', borderRadius: 12, background: '#1a1208', color: 'white', textDecoration: 'none' }}>
+            Go to Homepage
+          </Link>
+        </div>
       </div>
     );
   }
 
   const { vendor, shop, products } = data;
-  const activeSettings = previewSettings || marketplaceSettings;
+  const settings = previewSettings || marketplaceSettings;
+  const accentColor = settings?.primary_color || '#c8a96e';
+  const darkColor = settings?.secondary_color || '#1a1208';
+  const creamColor = settings?.background_color || '#faf8f5';
+  const midColor = '#6b5c45';
+  const lightColor = '#ede8df';
+  const warmColor = '#f0ebe2';
+  const brandName = shop?.name || vendor.business_name;
+  const tagline = settings?.banner_subtext?.trim() || shop?.description || 'Thoughtfully crafted local products with premium quality and warm service.';
+  const heroTitle = settings?.banner_text?.trim() || brandName;
   const activeProducts = products
     .filter((product) => product.status === 'ACTIVE' || product.status === 'approved')
-    .slice(0, activeSettings?.products_per_page || products.length);
-
-  const pageBackground = activeSettings?.background_color || '#faf8f5';
-  const accentColor = activeSettings?.primary_color || '#c8a96e';
-  const surfaceColor = activeSettings?.secondary_color || '#ffffff';
-  const showBanner = activeSettings?.show_banner !== false;
-  const showVendorInfo = activeSettings?.show_vendor_info !== false;
-  const showContactInfo = activeSettings?.show_contact_info !== false;
-  const bannerTitle = activeSettings?.banner_text?.trim() || shop?.name || vendor.business_name;
-  const bannerSubtitle = activeSettings?.banner_subtext?.trim() || shop?.description || '';
-  const categoryItems = ['Storefront', 'Featured', 'Collections', 'Offers', 'About'];
-  const isMobile = viewportWidth < 768;
-  const isTablet = viewportWidth < 1024;
+    .slice(0, settings?.products_per_page || products.length || 8);
+  const featuredProducts = activeProducts.slice(0, 4);
+  const recentProducts = activeProducts.slice(4, 8).length > 0 ? activeProducts.slice(4, 8) : activeProducts.slice(0, 4);
+  const categories = Array.from(new Set(activeProducts.map((product) => product.category_name).filter(Boolean))).slice(0, 10);
+  const addressText = [shop?.address, shop?.city, shop?.state, shop?.postal_code].filter(Boolean).join(', ');
+  const supportLine = shop?.contact_email || vendor.business_email || 'support@localshop.in';
+  const workingDays = shop?.working_days && shop.working_days.length > 0 ? shop.working_days.join(' / ') : 'Mon-Sat';
+  const businessHours = shop?.opening_time && shop?.closing_time ? `${shop.opening_time} - ${shop.closing_time}` : '9am - 7pm';
+  const overallReviews = activeProducts.reduce((sum, product) => sum + (product.review_count || 0), 0);
+  const averageRating =
+    activeProducts.reduce((sum, product) => sum + (product.rating || 4.6), 0) /
+    Math.max(activeProducts.length, 1);
   const socialLinks = [
-    { label: 'Facebook', value: activeSettings?.facebook_url },
-    { label: 'Instagram', value: activeSettings?.instagram_url },
-    { label: 'Twitter', value: activeSettings?.twitter_url },
-    { label: 'WhatsApp', value: activeSettings?.whatsapp_number },
-  ].filter((item) => item.value);
+    settings?.facebook_url,
+    settings?.instagram_url,
+    settings?.twitter_url,
+    settings?.whatsapp_number,
+  ].filter(Boolean);
+
+  const slides = [
+    {
+      tag: 'Featured Vendor',
+      title: heroTitle,
+      copy: tagline,
+      button: 'Visit Store',
+      background: shop?.banner_url
+        ? `linear-gradient(120deg, rgba(26,18,8,0.78) 55%, rgba(61,46,24,0.62) 100%), url(${shop.banner_url}) center/cover`
+        : `linear-gradient(120deg, ${darkColor} 55%, ${accentColor} 180%)`,
+      visual: shop?.logo_url,
+    },
+    {
+      tag: 'Trust & Service',
+      title: vendor.verified ? 'Verified Seller' : 'Local Business You Can Trust',
+      copy: addressText || 'Reliable quality, authentic service, and a storefront designed to make buying feel easy.',
+      button: 'See Contact Info',
+      background: 'linear-gradient(120deg, #0d2238 55%, #1a3d5c 100%)',
+      visual: '',
+    },
+    {
+      tag: 'Shop Highlights',
+      title: `${featuredProducts.length || activeProducts.length} curated products`,
+      copy: `Rated ${averageRating.toFixed(1)} by customers with ${overallReviews || 24} review mentions across this storefront.`,
+      button: 'Explore Products',
+      background: 'linear-gradient(120deg, #1a0d0d 55%, #3d1818 100%)',
+      visual: featuredProducts[0]?.images?.[0] || '',
+    },
+  ];
 
   return (
-    <div
-      style={{
-        width: '100%',
-        minHeight: '100vh',
-        background: pageBackground,
-        fontFamily: "'DM Sans', sans-serif",
-        color: '#1a1208',
-        overflowX: 'hidden',
-      }}
-    >
-      {activeSettings?.custom_css ? <style>{activeSettings.custom_css}</style> : null}
+    <div style={{ width: '100%', minHeight: '100vh', background: creamColor, color: '#1a1a1a', fontFamily: "'DM Sans', sans-serif", fontSize: 14, overflowX: 'hidden' }}>
+      {settings?.custom_css ? <style>{settings.custom_css}</style> : null}
+      <style>{`
+        .vp-topbar{background:${darkColor};color:#e8d5b0;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:0.08em}
+        .vp-topbar span{opacity:0.82}
+        .vp-header{background:white;border-bottom:1px solid ${lightColor};padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+        .vp-logo{display:flex;flex-direction:column}
+        .vp-logo-name{font-family:'Playfair Display',serif;font-size:22px;color:${darkColor};letter-spacing:0.02em}
+        .vp-logo-sub{font-size:10px;color:${accentColor};letter-spacing:0.18em;text-transform:uppercase;margin-top:1px}
+        .vp-header-actions{display:flex;align-items:center;gap:16px}
+        .vp-search{display:flex;align-items:center;background:${warmColor};border-radius:24px;padding:8px 16px;gap:8px;width:220px}
+        .vp-search input{border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;width:100%;outline:none;color:${darkColor}}
+        .vp-search input::placeholder{color:${midColor}}
+        .vp-icon-btn{width:36px;height:36px;border-radius:50%;background:${warmColor};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;color:${darkColor};font-size:14px}
+        .vp-badge{position:absolute;top:-2px;right:-2px;background:${accentColor};color:white;border-radius:50%;width:16px;height:16px;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:500}
+        .vp-nav{background:white;border-bottom:1px solid ${lightColor};padding:0 24px;display:flex;align-items:center;gap:0;overflow-x:auto}
+        .vp-nav-item{padding:12px 16px;font-size:13px;color:${midColor};cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all 0.2s;font-weight:400}
+        .vp-nav-item.active,.vp-nav-item:hover{color:${darkColor};border-bottom-color:${accentColor};font-weight:500}
+        .vp-carousel{position:relative;overflow:hidden;height:340px;background:${darkColor}}
+        .vp-slides{display:flex;transition:transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94);height:100%}
+        .vp-slide{min-width:100%;height:100%;display:flex;align-items:center;padding:0 60px;position:relative;overflow:hidden}
+        .vp-slide-content{z-index:2;max-width:420px}
+        .vp-slide-tag{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:${accentColor};font-weight:500;margin-bottom:12px}
+        .vp-slide-title{font-family:'Playfair Display',serif;font-size:36px;color:white;line-height:1.15;margin-bottom:12px}
+        .vp-slide-sub{font-size:13px;color:rgba(255,255,255,0.65);line-height:1.6;margin-bottom:24px}
+        .vp-slide-btn{display:inline-flex;align-items:center;justify-content:center;background:${accentColor};color:white;text-decoration:none;border:none;padding:11px 28px;border-radius:4px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;letter-spacing:0.04em}
+        .vp-slide-visual{position:absolute;right:80px;top:50%;transform:translateY(-50%);width:220px;height:220px;border-radius:16px;overflow:hidden;opacity:0.92;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center}
+        .vp-slide-visual img{width:100%;height:100%;object-fit:cover}
+        .vp-slide-visual-fallback{width:220px;height:220px;display:flex;align-items:center;justify-content:center;color:${accentColor};font-family:'Playfair Display',serif;font-size:56px;border:1px solid rgba(255,255,255,0.12)}
+        .vp-carousel-dots{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10}
+        .vp-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.35);cursor:pointer;transition:all 0.2s}
+        .vp-dot.active{background:${accentColor};width:22px;border-radius:4px}
+        .vp-carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;width:38px;height:38px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;font-size:16px;transition:background 0.2s}
+        .vp-carousel-arrow:hover{background:rgba(255,255,255,0.22)}
+        .vp-arrow-left{left:16px}
+        .vp-arrow-right{right:16px}
+        .vp-main{max-width:1200px;margin:0 auto;padding:32px 24px}
+        .vp-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:16px}
+        .vp-section-title{font-family:'Playfair Display',serif;font-size:24px;color:${darkColor}}
+        .vp-see-all{font-size:12px;color:${accentColor};cursor:pointer;letter-spacing:0.06em;font-weight:500}
+        .vp-category-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:40px}
+        .vp-cat-card{background:white;border-radius:12px;padding:20px 12px;text-align:center;border:1px solid ${lightColor};transition:all 0.2s}
+        .vp-cat-card:hover{border-color:${accentColor};transform:translateY(-2px);box-shadow:0 6px 20px rgba(200,169,110,0.12)}
+        .vp-cat-icon{font-size:28px;margin-bottom:10px;display:block}
+        .vp-cat-name{font-size:12px;color:${midColor};font-weight:500}
+        .vp-product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:40px}
+        .vp-product-card{background:white;border-radius:14px;overflow:hidden;border:1px solid ${lightColor};transition:all 0.22s;cursor:pointer}
+        .vp-product-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,0.08)}
+        .vp-product-img{height:180px;display:flex;align-items:center;justify-content:center;background:${warmColor};position:relative}
+        .vp-product-img img{width:100%;height:100%;object-fit:cover}
+        .vp-product-badge{position:absolute;top:10px;left:10px;background:${accentColor};color:white;font-size:10px;padding:3px 10px;border-radius:12px;font-weight:500;letter-spacing:0.04em}
+        .vp-product-badge.new{background:#2d6a4f}
+        .vp-product-info{padding:14px}
+        .vp-product-name{font-size:13px;font-weight:500;color:${darkColor};margin-bottom:4px;line-height:1.4}
+        .vp-product-desc{font-size:11px;color:${midColor};margin-bottom:10px;line-height:1.5}
+        .vp-product-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
+        .vp-price{font-size:16px;font-weight:600;color:${darkColor}}
+        .vp-price-old{font-size:11px;color:${midColor};text-decoration:line-through;margin-left:4px}
+        .vp-add-btn{background:${darkColor};color:white;border:none;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;transition:background 0.2s}
+        .vp-add-btn:hover{background:${accentColor}}
+        .vp-banner-strip{background:${darkColor};padding:28px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:14px;margin-bottom:40px;gap:16px}
+        .vp-banner-text h3{font-family:'Playfair Display',serif;font-size:20px;color:white;margin-bottom:6px}
+        .vp-banner-text p{font-size:12px;color:rgba(255,255,255,0.6)}
+        .vp-banner-cta{display:inline-flex;align-items:center;justify-content:center;background:${accentColor};color:white;text-decoration:none;border:none;padding:11px 26px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
+        .vp-footer{background:${darkColor};color:rgba(255,255,255,0.6);padding:32px 24px;text-align:center;font-size:12px}
+        .vp-footer-logo{font-family:'Playfair Display',serif;color:${accentColor};font-size:20px;margin-bottom:8px}
+        .vp-rating{display:flex;align-items:center;gap:3px;margin-bottom:6px}
+        .vp-stars{color:${accentColor};font-size:12px}
+        .vp-rating-count{font-size:10px;color:${midColor}}
+        .vp-empty-block{background:white;border:1px solid ${lightColor};border-radius:14px;padding:28px;color:${midColor};margin-bottom:40px}
+        @media (max-width: 1100px){
+          .vp-category-grid{grid-template-columns:repeat(3,1fr)}
+          .vp-product-grid{grid-template-columns:repeat(2,1fr)}
+          .vp-slide{padding:0 24px}
+          .vp-slide-visual{right:24px;width:180px;height:180px}
+        }
+        @media (max-width: 760px){
+          .vp-topbar,.vp-header{padding-left:14px;padding-right:14px}
+          .vp-topbar{flex-direction:column;gap:6px;text-align:center}
+          .vp-header{flex-direction:column;gap:12px}
+          .vp-search{width:100%}
+          .vp-nav{padding:0 10px}
+          .vp-main{padding:24px 14px}
+          .vp-category-grid,.vp-product-grid{grid-template-columns:1fr}
+          .vp-section-header,.vp-banner-strip{flex-direction:column;align-items:flex-start}
+          .vp-carousel{height:auto}
+          .vp-slide{padding:28px 16px 70px;min-height:360px}
+          .vp-slide-title{font-size:30px}
+          .vp-slide-visual{position:relative;right:auto;top:auto;transform:none;width:100%;max-width:220px;height:220px;margin-top:22px}
+        }
+      `}</style>
 
-      <div
-        style={{
-          background: '#1a1208',
-          color: '#e8d5b0',
-          padding: isMobile ? '8px 14px' : '8px 24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? '6px' : 0,
-          fontSize: '11px',
-          letterSpacing: '0.08em',
-          textAlign: isMobile ? 'center' : 'left',
-        }}
-      >
-        <span>{bannerSubtitle || 'Preview your storefront with marketplace styling.'}</span>
-        <span>{showContactInfo && shop?.contact_email ? shop.contact_email : 'Vendor storefront preview'}</span>
+      <div className="vp-topbar">
+        <span>{tagline || 'Discover premium local products'}</span>
+        <span>{workingDays}: {businessHours} | {supportLine}</span>
       </div>
 
-      <div
-        style={{
-          background: 'white',
-          borderBottom: '1px solid #ede8df',
-          padding: isMobile ? '14px' : '16px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? '12px' : '16px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span
-            style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: '22px',
-              color: '#1a1208',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {shop?.name || vendor.business_name}
-          </span>
-          <span
-            style={{
-              fontSize: '10px',
-              color: accentColor,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              marginTop: '1px',
-            }}
-          >
-            Vendor Storefront
-          </span>
+      <header className="vp-header">
+        <div className="vp-logo">
+          <span className="vp-logo-name">{brandName}</span>
+          <span className="vp-logo-sub">Vendor Storefront</span>
         </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: '#f0ebe2',
-            borderRadius: '24px',
-            padding: '8px 16px',
-            gap: '8px',
-            width: isMobile ? '100%' : isTablet ? '220px' : '260px',
-            maxWidth: isMobile ? '100%' : '260px',
-          }}
-        >
+        <div className="vp-search">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b5c45" strokeWidth="2">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input
-            type="text"
-            placeholder="Search this store..."
-            style={{
-              border: 'none',
-              background: 'transparent',
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: '13px',
-              width: '100%',
-              outline: 'none',
-              color: '#1a1208',
-            }}
-          />
+          <input type="text" placeholder="Search products..." />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'center' : 'flex-end' }}>
-          {['♡', '🛍', '👤'].map((icon) => (
-            <button
-              key={icon}
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: '#f0ebe2',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '15px',
-              }}
-            >
-              {icon}
-            </button>
+        <div className="vp-header-actions">
+          <button className="vp-icon-btn">♡</button>
+          <button className="vp-icon-btn">
+            🛍
+            <span className="vp-badge">{Math.min(activeProducts.length, 9)}</span>
+          </button>
+          <button className="vp-icon-btn">👤</button>
+        </div>
+      </header>
+
+      <nav className="vp-nav">
+        <div className="vp-nav-item active">All</div>
+        {categories.map((category) => (
+          <div key={category} className="vp-nav-item">{category}</div>
+        ))}
+        {socialLinks.length > 0 && <div className="vp-nav-item">Social</div>}
+        <div className="vp-nav-item">About</div>
+      </nav>
+
+      <div className="vp-carousel">
+        <button className="vp-carousel-arrow vp-arrow-left" onClick={() => setCurrentSlide((prev) => (prev + 2) % 3)}>
+          &#8592;
+        </button>
+        <div className="vp-slides" style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
+          {slides.map((slide, index) => (
+            <div key={index} className="vp-slide" style={{ background: slide.background }}>
+              <div className="vp-slide-content">
+                <div className="vp-slide-tag">{slide.tag}</div>
+                <div className="vp-slide-title">{slide.title}</div>
+                <div className="vp-slide-sub">{slide.copy}</div>
+                <Link to={`/vendor/${vendor.id}`} className="vp-slide-btn">
+                  {slide.button}
+                </Link>
+              </div>
+              <div className="vp-slide-visual">
+                {slide.visual ? (
+                  <img src={slide.visual} alt={slide.title} />
+                ) : (
+                  <div className="vp-slide-visual-fallback">{brandName.slice(0, 1).toUpperCase()}</div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
+        <div className="vp-carousel-dots">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className={`vp-dot ${currentSlide === index ? 'active' : ''}`} onClick={() => setCurrentSlide(index)} />
+          ))}
+        </div>
+        <button className="vp-carousel-arrow vp-arrow-right" onClick={() => setCurrentSlide((prev) => (prev + 1) % 3)}>
+          &#8594;
+        </button>
       </div>
 
-      <div
-        style={{
-          background: 'white',
-          borderBottom: '1px solid #ede8df',
-          padding: isMobile ? '0 10px' : '0 24px',
-          display: 'flex',
-          alignItems: 'center',
-          overflowX: 'auto',
-        }}
-      >
-        {categoryItems.map((item, index) => (
-          <div
-            key={item}
-            style={{
-              padding: '12px 16px',
-              fontSize: '13px',
-              color: index === 0 ? '#1a1208' : '#6b5c45',
-              borderBottom: index === 0 ? `2px solid ${accentColor}` : '2px solid transparent',
-              whiteSpace: 'nowrap',
-              fontWeight: index === 0 ? '500' : '400',
-            }}
-          >
-            {item}
-          </div>
-        ))}
-      </div>
-
-      {showBanner && (
-        <div style={{ position: 'relative', overflow: 'hidden', minHeight: isMobile ? 'auto' : '360px', background: '#1a1208' }}>
-          <div
-            style={{
-              minHeight: isMobile ? 'auto' : '360px',
-              display: 'flex',
-              alignItems: 'center',
-              padding: isMobile ? '28px 18px 24px' : isTablet ? '32px 28px' : '0 60px',
-              position: 'relative',
-              overflow: 'hidden',
-              flexDirection: isTablet ? 'column' : 'row',
-              justifyContent: isTablet ? 'flex-start' : 'center',
-              gap: isTablet ? '24px' : 0,
-              background: shop?.banner_url
-                ? `linear-gradient(120deg, rgba(26,18,8,0.84) 38%, rgba(26,18,8,0.45) 100%), url(${shop.banner_url}) center/cover`
-                : `linear-gradient(120deg, #1a1208 45%, ${accentColor} 130%)`,
-            }}
-          >
-            <div style={{ zIndex: 2, maxWidth: isTablet ? '100%' : '460px', width: isTablet ? '100%' : 'auto' }}>
-              <div
-                style={{
-                  fontSize: '10px',
-                  letterSpacing: '0.2em',
-                  textTransform: 'uppercase',
-                  color: accentColor,
-                  fontWeight: '500',
-                  marginBottom: '12px',
-                }}
-              >
-                Welcome to
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: isMobile ? '30px' : isTablet ? '36px' : '42px',
-                  color: 'white',
-                  lineHeight: '1.1',
-                  marginBottom: '14px',
-                }}
-              >
-                {bannerTitle}
-              </div>
-              <div
-                style={{
-                  fontSize: '14px',
-                  color: 'rgba(255,255,255,0.74)',
-                  lineHeight: '1.7',
-                  marginBottom: '26px',
-                }}
-              >
-                {bannerSubtitle || 'A polished storefront preview with your live branding, layout, and product choices.'}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                <button
-                  style={{
-                    background: accentColor,
-                    color: 'white',
-                    border: 'none',
-                    padding: '11px 28px',
-                    borderRadius: '4px',
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  Shop This Store
-                </button>
-                <span style={{ color: 'rgba(255,255,255,0.72)', fontSize: '13px' }}>
-                  {activeProducts.length} products available
-                </span>
-              </div>
-            </div>
-
-            <div
-              style={{
-                position: isTablet ? 'relative' : 'absolute',
-                right: isTablet ? 'auto' : '80px',
-                top: isTablet ? 'auto' : '50%',
-                transform: isTablet ? 'none' : 'translateY(-50%)',
-                width: isMobile ? '100%' : '260px',
-                maxWidth: isTablet ? '100%' : '260px',
-                minHeight: '220px',
-                borderRadius: '22px',
-                overflow: 'hidden',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                padding: '22px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                {shop?.logo_url ? (
-                  <img
-                    src={shop.logo_url}
-                    alt={shop?.name || vendor.business_name}
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '18px',
-                      objectFit: 'cover',
-                      border: '2px solid rgba(255,255,255,0.45)',
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: '64px',
-                      height: '64px',
-                      borderRadius: '18px',
-                      background: accentColor,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontFamily: "'Playfair Display', serif",
-                      fontSize: '22px',
-                    }}
-                  >
-                    {(shop?.name || vendor.business_name).slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <div style={{ color: 'white', fontWeight: 600, fontSize: '17px' }}>
-                    {shop?.name || vendor.business_name}
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: '12px', marginTop: '4px' }}>
-                    {vendor.verified ? 'Verified seller' : 'Growing local brand'}
-                  </div>
-                </div>
-              </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                  gap: '12px',
-                  marginTop: '18px',
-                }}
-              >
-                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '14px', padding: '14px' }}>
-                  <div style={{ color: accentColor, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                    Products
-                  </div>
-                  <div style={{ color: 'white', fontSize: '24px', fontWeight: 700, marginTop: '6px' }}>
-                    {activeProducts.length}
-                  </div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '14px', padding: '14px' }}>
-                  <div style={{ color: accentColor, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                    Status
-                  </div>
-                  <div style={{ color: 'white', fontSize: '16px', fontWeight: 700, marginTop: '10px' }}>
-                    {vendor.verified ? 'Live' : 'Preview'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <main className="vp-main">
+        <div className="vp-section-header">
+          <h2 className="vp-section-title">Shop by Category</h2>
+          <span className="vp-see-all">View All &rarr;</span>
         </div>
-      )}
-
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '24px 14px 40px' : '32px 24px 56px' }}>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '20px',
-            gap: '20px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <h2
-              style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: '28px',
-                color: '#1a1208',
-                margin: 0,
-              }}
-            >
-              Featured Products
-            </h2>
-            <p style={{ margin: '8px 0 0', color: '#6b5c45', fontSize: '14px' }}>
-              A storefront preview inspired by the marketplace showcase, with your own branding and content.
-            </p>
-          </div>
-          <span
-            style={{
-              fontSize: '12px',
-              color: accentColor,
-              letterSpacing: '0.06em',
-              fontWeight: '600',
-              textTransform: 'uppercase',
-            }}
-          >
-            {activeProducts.length} products visible
-          </span>
+        <div className="vp-category-grid">
+          {(categories.length > 0 ? categories : ['Featured', 'Popular', 'Seasonal', 'New']).slice(0, 6).map((category, index) => (
+            <div key={category} className="vp-cat-card">
+              <span className="vp-cat-icon">{['🧵', '🏺', '💍', '🌿', '🪔', '👜'][index % 6]}</span>
+              <div className="vp-cat-name">{category}</div>
+            </div>
+          ))}
         </div>
 
-        {showVendorInfo && (
-          <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1.5fr 1fr', gap: '24px', marginBottom: '28px' }}>
-            <div style={{ background: surfaceColor, borderRadius: '18px', padding: '24px', border: '1px solid #ede8df' }}>
-              <div
-                style={{
-                  fontSize: '11px',
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  color: accentColor,
-                  marginBottom: '12px',
-                }}
-              >
-                About This Store
-              </div>
-              <h3 style={{ fontFamily: "'Playfair Display', serif", fontSize: '28px', margin: '0 0 10px' }}>
-                {shop?.name || vendor.business_name}
-              </h3>
-              <p style={{ margin: 0, color: '#6b5c45', lineHeight: '1.8', fontSize: '14px' }}>
-                {shop?.description || bannerSubtitle || 'Use marketplace settings to personalize the message, colors, and presentation of your vendor storefront preview.'}
-              </p>
-            </div>
-            <div style={{ background: surfaceColor, borderRadius: '18px', padding: '24px', border: '1px solid #ede8df' }}>
-              <div
-                style={{
-                  fontSize: '11px',
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  color: accentColor,
-                  marginBottom: '14px',
-                }}
-              >
-                Store Details
-              </div>
-              <div style={{ display: 'grid', gap: '12px', color: '#6b5c45', fontSize: '14px' }}>
-                <div><strong style={{ color: '#1a1208' }}>Business:</strong> {vendor.business_name}</div>
-                {shop?.address ? <div><strong style={{ color: '#1a1208' }}>Address:</strong> {shop.address}, {shop.city}, {shop.state} {shop.postal_code}</div> : null}
-                {showContactInfo && shop?.contact_phone ? <div><strong style={{ color: '#1a1208' }}>Phone:</strong> {shop.contact_phone}</div> : null}
-                {showContactInfo && shop?.contact_email ? <div><strong style={{ color: '#1a1208' }}>Email:</strong> {shop.contact_email}</div> : null}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeProducts.length === 0 ? (
-          <div style={{ background: surfaceColor, borderRadius: '18px', padding: '72px 24px', textAlign: 'center', border: '1px solid #ede8df' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>Box</div>
-            <h3 style={{ margin: '0 0 8px', fontSize: '20px', color: '#1a1208' }}>No products in this preview yet</h3>
-            <p style={{ margin: 0, color: '#6b5c45' }}>Add products or switch visibility settings to see the storefront fill out here.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))', gap: '24px' }}>
-            {activeProducts.map((product) => (
-              <div
-                key={product.id}
-                style={{
-                  background: surfaceColor,
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  border: '1px solid #ede8df',
-                  transition: 'all 0.22s',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-3px)';
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <div
-                  style={{
-                    height: '220px',
-                    background: product.images[0]
-                      ? `url(${product.images[0]}) center/cover`
-                      : `linear-gradient(135deg, ${accentColor} 0%, #764ba2 100%)`,
-                    position: 'relative',
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '16px',
-                      right: '16px',
-                      background: 'rgba(255,255,255,0.92)',
-                      color: '#1a1208',
-                      padding: '6px 10px',
-                      borderRadius: '999px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                    }}
-                  >
-                    {product.category_name || 'Featured'}
+        <div className="vp-section-header">
+          <h2 className="vp-section-title">Featured Products</h2>
+          <span className="vp-see-all">See All &rarr;</span>
+        </div>
+        {featuredProducts.length > 0 ? (
+          <div className="vp-product-grid">
+            {featuredProducts.map((product, index) => (
+              <article key={product.id} className="vp-product-card">
+                <div className="vp-product-img">
+                  <div className={`vp-product-badge ${index === 1 ? 'new' : ''}`}>
+                    {product.discount_percentage > 0 ? 'Sale' : index === 1 ? 'New' : 'Featured'}
                   </div>
-                  {!product.images[0] && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '42px',
-                        color: 'rgba(255,255,255,0.9)',
-                      }}
-                    >
-                      Box
+                  {product.images[0] ? (
+                    <img src={product.images[0]} alt={product.name} />
+                  ) : (
+                    <div style={{ fontSize: 56, color: accentColor, fontFamily: "'Playfair Display', serif" }}>
+                      {product.name.slice(0, 1).toUpperCase()}
                     </div>
                   )}
                 </div>
-                <div style={{ padding: '18px' }}>
-                  <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: '#1a1208' }}>
-                    {product.name}
-                  </h3>
-                  <p style={{ margin: '0 0 14px', fontSize: '13px', color: '#6b5c45', lineHeight: '1.65', minHeight: '42px' }}>
-                    {product.description || 'A beautiful product card preview matching the main marketplace presentation.'}
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : 0 }}>
+                <div className="vp-product-info">
+                  {settings?.show_ratings !== false && (
+                    <div className="vp-rating">
+                      <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 5)))}</span>
+                      <span className="vp-rating-count">({product.review_count || 24})</span>
+                    </div>
+                  )}
+                  <div className="vp-product-name">{product.name}</div>
+                  <div className="vp-product-desc">{product.description || `${product.category_name || 'Store'} highlight from ${brandName}`}</div>
+                  <div className="vp-product-footer">
                     <div>
-                      {product.discount_percentage > 0 ? (
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '17px', color: '#dc3545', fontWeight: 700 }}>
-                            Rs {product.discounted_price.toLocaleString()}
-                          </span>
-                          <span style={{ fontSize: '12px', color: '#999', textDecoration: 'line-through' }}>
-                            Rs {product.price.toLocaleString()}
-                          </span>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '17px', fontWeight: 700, color: accentColor }}>
-                          Rs {product.price.toLocaleString()}
-                        </span>
-                      )}
+                      <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
+                      {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
                     </div>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        color: product.stock > 0 ? '#2e7d32' : '#a94442',
-                        background: product.stock > 0 ? '#e6f4ea' : '#fdecea',
-                        padding: '5px 8px',
-                        borderRadius: '999px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {product.stock > 0 ? `In Stock ${product.stock}` : 'Sold Out'}
-                    </span>
+                    <button className="vp-add-btn">+ Add</button>
                   </div>
-                  {product.discount_percentage > 0 && (
-                    <div style={{ marginTop: '10px', fontSize: '12px', color: '#dc3545', fontWeight: 600 }}>
-                      {product.discount_percentage}% OFF
-                    </div>
-                  )}
                 </div>
-              </div>
+              </article>
             ))}
           </div>
+        ) : (
+          <div className="vp-empty-block">Featured products will appear here once this vendor adds them.</div>
         )}
 
-        {(socialLinks.length > 0 || (shop?.gallery && shop.gallery.length > 0)) && (
-          <div style={{ display: 'grid', gridTemplateColumns: isTablet ? '1fr' : '1fr 1fr', gap: '24px', marginTop: '32px' }}>
-            <div style={{ background: surfaceColor, borderRadius: '18px', padding: '24px', border: '1px solid #ede8df' }}>
-              <div
-                style={{
-                  fontSize: '11px',
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  color: accentColor,
-                  marginBottom: '14px',
-                }}
-              >
-                Social Presence
-              </div>
-              {socialLinks.length > 0 ? (
-                <div style={{ display: 'grid', gap: '10px' }}>
-                  {socialLinks.map((item) => (
-                    <div key={item.label} style={{ fontSize: '14px', color: '#6b5c45' }}>
-                      <strong style={{ color: '#1a1208' }}>{item.label}:</strong> {item.value}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ margin: 0, color: '#6b5c45', fontSize: '14px' }}>Add social links in marketplace settings to preview them here.</p>
-              )}
-            </div>
-
-            <div style={{ background: surfaceColor, borderRadius: '18px', padding: '24px', border: '1px solid #ede8df' }}>
-              <div
-                style={{
-                  fontSize: '11px',
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  color: accentColor,
-                  marginBottom: '14px',
-                }}
-              >
-                Gallery Preview
-              </div>
-              {shop?.gallery && shop.gallery.length > 0 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '10px' }}>
-                  {shop.gallery.slice(0, 3).map((imageUrl, index) => (
-                    <img
-                      key={index}
-                      src={imageUrl}
-                      alt={`Gallery image ${index + 1}`}
-                      style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '12px' }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p style={{ margin: 0, color: '#6b5c45', fontSize: '14px' }}>Upload gallery images to make the storefront feel more alive.</p>
-              )}
-            </div>
+        <div className="vp-banner-strip">
+          <div className="vp-banner-text">
+            <h3>{vendor.verified ? 'Verified Seller, Premium Experience' : 'Discover This Local Business'}</h3>
+            <p>{addressText || 'Trusted storefront with curated products and direct vendor contact.'}</p>
           </div>
+          <a
+            href={settings?.whatsapp_number ? `https://wa.me/${String(settings.whatsapp_number).replace(/\D/g, '')}` : `mailto:${supportLine}`}
+            className="vp-banner-cta"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Contact Vendor
+          </a>
+        </div>
+
+        <div className="vp-section-header">
+          <h2 className="vp-section-title">Recently Added</h2>
+          <span className="vp-see-all">See All &rarr;</span>
+        </div>
+        {recentProducts.length > 0 ? (
+          <div className="vp-product-grid">
+            {recentProducts.map((product, index) => (
+              <article key={product.id} className="vp-product-card">
+                <div className="vp-product-img">
+                  {index === 0 && <div className="vp-product-badge new">New</div>}
+                  {product.images[0] ? (
+                    <img src={product.images[0]} alt={product.name} />
+                  ) : (
+                    <div style={{ fontSize: 56, color: accentColor, fontFamily: "'Playfair Display', serif" }}>
+                      {product.name.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="vp-product-info">
+                  {settings?.show_ratings !== false && (
+                    <div className="vp-rating">
+                      <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 4)))}</span>
+                      <span className="vp-rating-count">({product.review_count || 18})</span>
+                    </div>
+                  )}
+                  <div className="vp-product-name">{product.name}</div>
+                  <div className="vp-product-desc">{product.description || `Freshly added to the ${brandName} storefront.`}</div>
+                  <div className="vp-product-footer">
+                    <div>
+                      <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
+                      {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
+                    </div>
+                    <button className="vp-add-btn">+ Add</button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="vp-empty-block">More recent products and services will show here as inventory grows.</div>
         )}
-      </div>
+      </main>
+
+      <footer className="vp-footer">
+        <div className="vp-footer-logo">{brandName}</div>
+        <p>{tagline}</p>
+        <p style={{ marginTop: 8, fontSize: 11, opacity: 0.5 }}>
+          © 2026 {brandName}. All rights reserved.
+        </p>
+      </footer>
     </div>
   );
 };

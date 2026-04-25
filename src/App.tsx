@@ -9,13 +9,11 @@ import AppLayout from './components/layout/AppLayout';
 import LoginPage from './features/auth/LoginPage';
 import ProductsPage from './features/products/ProductsPage';
 import ProductFormPage from './features/products/ProductFormPage';
-import MarketplaceSettingsPage from './features/marketplace/MarketplaceSettingsPage';
 import ShopPage from './features/shop/ShopPage';
 import { PaymentsPage } from './features/payments/PaymentsPage';
 import NotificationsPage from './features/notifications/NotificationsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import PublicVendorPage from './features/public/PublicVendorPage';
-import ShowcasePage from './features/public/ShowcasePage';
 import AnalyticsPage from './features/analytics/AnalyticsPage';
 import { useAppDispatch } from './hooks/redux';
 import './styles/global.css';
@@ -37,7 +35,6 @@ const App: React.FC = () => (
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/showcase" element={<ShowcasePage />} />
           <Route path="/vendor/:vendorId" element={<PublicVendorPage />} />
 
           {/* Protected */}
@@ -49,7 +46,6 @@ const App: React.FC = () => (
               <Route path="/products/:id/edit" element={<ProductFormPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/shop" element={<ShopPage />} />
-              <Route path="/marketplace-settings" element={<MarketplaceSettingsPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
