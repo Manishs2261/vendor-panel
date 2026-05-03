@@ -12,6 +12,10 @@ const COLOR_HEX: Record<string, string> = {
   Yellow: '#f59e0b', Pink: '#ec4899', Purple: '#a855f7', Orange: '#f97316', Grey: '#6b7280',
 };
 
+type ImageEntry =
+  | { kind: 'existing'; id: string; url: string }
+  | { kind: 'new'; id: string; file: File; preview: string };
+
 const defaultForm: ProductForm = {
   name: '', description: '', price: 0, discount_percentage: 0,
   category_id: '', subcategory_id: '', brand: '', tags: [],
@@ -26,13 +30,14 @@ const ProductFormPage: React.FC = () => {
   const { categories, loading, selected } = useAppSelector((s) => s.products);
 
   const [form, setForm] = useState<ProductForm>(defaultForm);
-  const [images, setImages] = useState<File[]>([]);
-  const [existingImages, setExistingImages] = useState<string[]>([]);
-  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [imageEntries, setImageEntries] = useState<ImageEntry[]>([]);
   const [video, setVideo] = useState<File | null>(null);
+  const [imageUploadErrors, setImageUploadErrors] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
 
@@ -52,9 +57,10 @@ const ProductFormPage: React.FC = () => {
           latitude: data.latitude, longitude: data.longitude,
           variations: data.variations || [], status: (String(data.status || 'ACTIVE').toUpperCase() as 'ACTIVE' | 'INACTIVE'),
         });
-        setExistingImages(Array.isArray(data.images) ? data.images : []);
-        setImages([]);
-        setNewImagePreviews([]);
+        setImageEntries((Array.isArray(data.images) ? data.images : []).map((url: string, i: number) => ({
+          kind: 'existing' as const, id: `existing-${i}-${url.slice(-12)}`, url,
+        })));
+        setImageUploadErrors([]);
       });
     }
   }, [id, isEdit, dispatch]);
@@ -63,24 +69,36 @@ const ProductFormPage: React.FC = () => {
 
   const handleImages = (files: FileList | null) => {
     if (!files) return;
-    const remainingSlots = Math.max(0, 10 - (existingImages.length + images.length));
-    const arr = Array.from(files).slice(0, remainingSlots);
-    setImages((prev) => [...prev, ...arr]);
-    arr.forEach((file) => {
+    const maxImageSize = 5 * 1024 * 1024;
+    const remainingSlots = Math.max(0, 10 - imageEntries.length);
+    const selectedFiles = Array.from(files).slice(0, remainingSlots);
+    const rejectedFiles = selectedFiles.filter((file) => file.size > maxImageSize);
+    const acceptedFiles = selectedFiles.filter((file) => file.size <= maxImageSize);
+    setImageUploadErrors(rejectedFiles.map((file) => `${file.name} is too large. Maximum allowed size is 5MB.`));
+    if (!acceptedFiles.length) return;
+    acceptedFiles.forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (e) => setNewImagePreviews((prev) => [...prev, e.target?.result as string]);
+      reader.onload = (e) => {
+        const id = `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        setImageEntries((prev) => [...prev, { kind: 'new', id, file, preview: e.target?.result as string }]);
+      };
       reader.readAsDataURL(file);
     });
   };
 
   const removeImage = (idx: number) => {
-    if (idx < existingImages.length) {
-      setExistingImages((prev) => prev.filter((_, i) => i !== idx));
-      return;
-    }
-    const newIndex = idx - existingImages.length;
-    setImages((prev) => prev.filter((_, i) => i !== newIndex));
-    setNewImagePreviews((prev) => prev.filter((_, i) => i !== newIndex));
+    setImageUploadErrors([]);
+    setImageEntries((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const reorderImages = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    setImageEntries((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
   };
 
   const addTag = () => {
@@ -110,26 +128,32 @@ const ProductFormPage: React.FC = () => {
     if (!form.name || !form.price || !form.category_id) {
       toast.error('Please fill all required fields'); return;
     }
+    if (imageUploadErrors.length) {
+      toast.error('Please remove oversized images before saving.'); return;
+    }
     setSubmitting(true);
+    const existingImageUrls = imageEntries.filter((e) => e.kind === 'existing').map((e) => (e as { kind: 'existing'; id: string; url: string }).url);
+    const newImageFiles = imageEntries.filter((e) => e.kind === 'new').map((e) => (e as { kind: 'new'; id: string; file: File; preview: string }).file);
     try {
       let result;
       if (isEdit && id) {
-        result = await dispatch(updateProduct({ id, form: { ...form, images: existingImages } as any, newImages: images, video: video || undefined }));
+        result = await dispatch(updateProduct({ id, form: { ...form, images: existingImageUrls } as any, newImages: newImageFiles, video: video || undefined }));
       } else {
-        result = await dispatch(createProduct({ form, images, video: video || undefined }));
+        result = await dispatch(createProduct({ form, images: newImageFiles, video: video || undefined }));
       }
       if (createProduct.fulfilled.match(result) || updateProduct.fulfilled.match(result)) {
         toast.success(isEdit ? 'Product updated!' : 'Product created!');
         navigate('/products');
       } else {
-        toast.error((result as any).error?.message || 'Failed to save product');
+        const errorMessage = Array.isArray((result as any).payload)
+          ? (result as any).payload.join(', ')
+          : (result as any).payload || (result as any).error?.message || 'Failed to save product';
+        toast.error(String(errorMessage));
       }
     } finally {
       setSubmitting(false);
     }
   };
-
-  const allImagePreviews = [...existingImages, ...newImagePreviews];
 
   const parentCategories = (categories || []).filter((c) => !c.parent_id);
   const subCategories = (categories || []).filter((c) => c.parent_id === form.category_id);
@@ -201,7 +225,7 @@ const ProductFormPage: React.FC = () => {
             <div className="card-header"><div className="card-title">Media</div></div>
             <div
               className={`dropzone ${dragging ? 'drag' : ''}`}
-              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragOver={(e) => { e.preventDefault(); if (e.dataTransfer.types.includes('Files')) setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={(e) => { e.preventDefault(); setDragging(false); handleImages(e.dataTransfer.files); }}
               onClick={() => imageRef.current?.click()}
@@ -217,16 +241,42 @@ const ProductFormPage: React.FC = () => {
                 <span>Uploading product media and saving your product. Please wait...</span>
               </div>
             )}
-            {allImagePreviews.length > 0 && (
-              <div className="image-grid" style={{ marginTop: 14 }}>
-                {allImagePreviews.map((src, i) => (
-                  <div key={i} className="image-item">
-                    <img src={src} alt="" />
-                    <button type="button" className="image-remove" onClick={() => removeImage(i)}>x</button>
-                  </div>
+            {imageUploadErrors.length > 0 && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {imageUploadErrors.map((message) => (
+                  <div key={message} className="form-error">{message}</div>
                 ))}
               </div>
             )}
+            {imageEntries.length > 0 && (
+              <>
+                <div className="image-grid" style={{ marginTop: 14 }}>
+                  {imageEntries.map((entry, i) => {
+                    const src = entry.kind === 'existing' ? entry.url : (entry as { kind: 'new'; id: string; file: File; preview: string }).preview;
+                    return (
+                      <div
+                        key={entry.id}
+                        className={`image-item${dragSrcIdx === i ? ' img-dragging' : ''}${dragOverIdx === i && dragSrcIdx !== i ? ' img-drag-over' : ''}`}
+                        draggable
+                        onDragStart={() => setDragSrcIdx(i)}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i); }}
+                        onDrop={(e) => { e.preventDefault(); if (dragSrcIdx !== null) reorderImages(dragSrcIdx, i); setDragSrcIdx(null); setDragOverIdx(null); }}
+                        onDragEnd={() => { setDragSrcIdx(null); setDragOverIdx(null); }}
+                      >
+                        <img src={src} alt="" />
+                        <button type="button" className="image-remove" onClick={() => removeImage(i)}>x</button>
+                        <div className="image-drag-handle" title="Drag to reorder">⠿</div>
+                        {i === 0 && <div style={{ position: 'absolute', bottom: 4, right: 28, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 9, padding: '1px 5px', borderRadius: 3, pointerEvents: 'none' }}>Cover</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+                {imageEntries.length > 1 && (
+                  <div className="image-reorder-hint">
+                    <span>⠿</span> Drag images to reorder · First image is the cover
+                  </div>
+                )}
+              </>
             )}
             <div style={{ marginTop: 16 }}>
               <label className="form-label">Product Video (optional)</label>
