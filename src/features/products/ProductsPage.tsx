@@ -71,12 +71,49 @@ const ProductsPage: React.FC = () => {
     {
       key: 'name', label: 'Product',
       render: (_, row) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        <div className="product-hover-trigger" style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <div className="product-img product-img-placeholder" style={{ background: 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {row.images[0] ? <img src={row.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span>No image</span>}
           </div>
           <div style={{ minWidth: 0 }}>
             <div className="product-name">{row.name}</div>
+          </div>
+          <div className="product-hover-card">
+            <div className="product-hover-media">
+              {row.images[0] ? <img src={row.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span>No image</span>}
+            </div>
+            <div className="product-hover-content">
+              <div className="product-hover-title-row">
+                <div className="product-hover-title">{row.name}</div>
+                <StatusBadge status={row.status} />
+              </div>
+              <div className="product-hover-meta">{row.category_name || 'Uncategorized'}</div>
+              <div className="product-hover-grid">
+                <div>
+                  <span className="product-hover-label">Price</span>
+                  <strong>INR {row.price?.toLocaleString?.() ?? row.price}</strong>
+                </div>
+                <div>
+                  <span className="product-hover-label">Stock</span>
+                  <strong>{row.stock ?? 0}</strong>
+                </div>
+                <div>
+                  <span className="product-hover-label">Clicks</span>
+                  <strong>{row.click_count ?? 0}</strong>
+                </div>
+                <div>
+                  <span className="product-hover-label">Searches</span>
+                  <strong>{row.search_count ?? 0}</strong>
+                </div>
+              </div>
+              <div className="product-hover-description">{row.description || 'No description added yet.'}</div>
+              <div className="product-hover-tags">
+                {row.tags?.length ? row.tags.slice(0, 6).map((tag) => (
+                  <span key={tag} className="product-hover-tag">{tag}</span>
+                )) : <span className="product-hover-empty">No tags</span>}
+              </div>
+              <div className="product-hover-footer">Updated: {formatDateTime(row.updated_at || row.created_at)}</div>
+            </div>
           </div>
         </div>
       ),
@@ -317,5 +354,6 @@ const ProductsPage: React.FC = () => {
 };
 
 export default ProductsPage;
+
 
 

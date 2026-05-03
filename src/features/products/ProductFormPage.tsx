@@ -27,7 +27,8 @@ const ProductFormPage: React.FC = () => {
 
   const [form, setForm] = useState<ProductForm>(defaultForm);
   const [images, setImages] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [video, setVideo] = useState<File | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -51,7 +52,9 @@ const ProductFormPage: React.FC = () => {
           latitude: data.latitude, longitude: data.longitude,
           variations: data.variations || [], status: (String(data.status || 'ACTIVE').toUpperCase() as 'ACTIVE' | 'INACTIVE'),
         });
-        setImagePreviews(data.images);
+        setExistingImages(Array.isArray(data.images) ? data.images : []);
+        setImages([]);
+        setNewImagePreviews([]);
       });
     }
   }, [id, isEdit, dispatch]);
@@ -60,18 +63,24 @@ const ProductFormPage: React.FC = () => {
 
   const handleImages = (files: FileList | null) => {
     if (!files) return;
-    const arr = Array.from(files).slice(0, 10 - images.length);
+    const remainingSlots = Math.max(0, 10 - (existingImages.length + images.length));
+    const arr = Array.from(files).slice(0, remainingSlots);
     setImages((prev) => [...prev, ...arr]);
     arr.forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (e) => setImagePreviews((prev) => [...prev, e.target?.result as string]);
+      reader.onload = (e) => setNewImagePreviews((prev) => [...prev, e.target?.result as string]);
       reader.readAsDataURL(file);
     });
   };
 
   const removeImage = (idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== idx));
+    if (idx < existingImages.length) {
+      setExistingImages((prev) => prev.filter((_, i) => i !== idx));
+      return;
+    }
+    const newIndex = idx - existingImages.length;
+    setImages((prev) => prev.filter((_, i) => i !== newIndex));
+    setNewImagePreviews((prev) => prev.filter((_, i) => i !== newIndex));
   };
 
   const addTag = () => {
@@ -105,7 +114,7 @@ const ProductFormPage: React.FC = () => {
     try {
       let result;
       if (isEdit && id) {
-        result = await dispatch(updateProduct({ id, form, newImages: images, video: video || undefined }));
+        result = await dispatch(updateProduct({ id, form: { ...form, images: existingImages } as any, newImages: images, video: video || undefined }));
       } else {
         result = await dispatch(createProduct({ form, images, video: video || undefined }));
       }
@@ -119,6 +128,8 @@ const ProductFormPage: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  const allImagePreviews = [...existingImages, ...newImagePreviews];
 
   const parentCategories = (categories || []).filter((c) => !c.parent_id);
   const subCategories = (categories || []).filter((c) => c.parent_id === form.category_id);
@@ -206,15 +217,16 @@ const ProductFormPage: React.FC = () => {
                 <span>Uploading product media and saving your product. Please wait...</span>
               </div>
             )}
-            {imagePreviews.length > 0 && (
+            {allImagePreviews.length > 0 && (
               <div className="image-grid" style={{ marginTop: 14 }}>
-                {imagePreviews.map((src, i) => (
+                {allImagePreviews.map((src, i) => (
                   <div key={i} className="image-item">
                     <img src={src} alt="" />
                     <button type="button" className="image-remove" onClick={() => removeImage(i)}>x</button>
                   </div>
                 ))}
               </div>
+            )}
             )}
             <div style={{ marginTop: 16 }}>
               <label className="form-label">Product Video (optional)</label>
