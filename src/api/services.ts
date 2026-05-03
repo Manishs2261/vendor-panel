@@ -71,21 +71,17 @@ export const authApi = {
     password: string;
   }) => apiClient.post<AuthTokenResponse>("/auth/register/vendor", data),
 
-  sendEmailOtp: (email: string) =>
-    apiClient.post("/auth/otp/email/send", { email }),
+  sendEmailOtp: () =>
+    apiClient.post("/auth/verify/email/send"),
 
-  verifyEmailOtp: (email: string, otp: string) =>
-    apiClient.post<{
-      access_token: string;
-      refresh_token: string;
-      user: Vendor;
-    }>("/auth/otp/email/verify", { email, otp }),
+  verifyEmailOtp: (otp: string) =>
+    apiClient.post("/auth/verify/email/confirm", { otp }),
 
-  sendPhoneOtp: (phone: string) =>
-    apiClient.post("/auth/otp/phone/send", { phone }),
+  sendPhoneOtp: () =>
+    apiClient.post("/auth/verify/phone/send"),
 
-  verifyPhoneOtp: (phone: string, otp: string) =>
-    apiClient.post("/auth/otp/phone/verify", { phone, otp }),
+  verifyPhoneOtp: (otp: string) =>
+    apiClient.post("/auth/verify/phone/confirm", { otp }),
 
   forgotPassword: (email: string) =>
     apiClient.post("/auth/forgot-password", { email }),
