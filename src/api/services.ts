@@ -95,6 +95,12 @@ export const authApi = {
 
   me: () => apiClient.get<Vendor>("/auth/me"),
 
+  updateProfile: (data: { name?: string; email?: string; phone?: string }) =>
+    apiClient.put<Vendor>("/users/me", data),
+
+  changePassword: (old_password: string, new_password: string) =>
+    apiClient.post("/auth/change-password", { old_password, new_password }),
+
   refresh: (refresh_token: string) =>
     axios.post<{ access_token: string; refresh_token: string }>(
       `${BASE_URL}/auth/refresh`,
