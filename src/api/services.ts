@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+﻿import { apiClient } from "./client";
 import axios from "axios";
 import type {
   Vendor,
@@ -37,7 +37,26 @@ export type VendorProfileResponse = {
   created_at?: string;
 };
 
-// ─── Auth API ─────────────────────────────────────────────────────────────────
+const normalizeProductPayload = (product: any): Product => ({
+  ...product,
+  status: String(product?.status || '').toUpperCase() as Product['status'],
+  variations: product?.variations || product?.variants || [],
+  tags: Array.isArray(product?.tags) ? product.tags : [],
+});
+
+const toProductRequest = (data: ProductForm | Partial<ProductForm>) => {
+  const payload: Record<string, unknown> = { ...data };
+  if ('variations' in payload) {
+    payload.variants = payload.variations;
+    delete payload.variations;
+  }
+  if (typeof payload.status === 'string') {
+    payload.status = String(payload.status).toLowerCase();
+  }
+  return payload;
+};
+
+// â”€â”€â”€ Auth API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const authApi = {
   login: (email: string, password: string) =>
     apiClient.post<AuthTokenResponse>("/auth/login/vendor", {
@@ -85,7 +104,7 @@ export const authApi = {
   logout: () => apiClient.post("/auth/logout"),
 };
 
-// ─── Shop API ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Shop API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const vendorApi = {
   me: () => apiClient.get<VendorProfileResponse>("/vendor/me"),
 };
@@ -133,7 +152,7 @@ export const shopApi = {
     apiClient.post("/vendor/shop/verify-email/confirm", { otp }),
 };
 
-// ─── Product API ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Product API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const productApi = {
   list: (params: {
     page?: number;
@@ -167,12 +186,15 @@ export const productApi = {
     });
   },
 
-  get: (id: string) => apiClient.get<Product>(`/vendor/products/${id}`),
+  get: async (id: string) => {
+    const response = await apiClient.get<Product>(`/vendor/products/${id}`);
+    return { ...response, data: normalizeProductPayload(response.data) };
+  },
 
   create: (data: ProductForm, images: File[], video?: File) => {
     const fd = new FormData();
-    const { ...rest } = data;
-    fd.append("data", JSON.stringify(rest));
+    const payload = toProductRequest(data);
+    fd.append("data", JSON.stringify(payload));
     images.forEach((img) => fd.append("images", img));
     if (video) fd.append("video", video);
     return apiClient.post<Product>("/vendor/products", fd, {
@@ -187,7 +209,8 @@ export const productApi = {
     video?: File,
   ) => {
     const fd = new FormData();
-    fd.append("data", JSON.stringify(data));
+    const payload = toProductRequest(data);
+    fd.append("data", JSON.stringify(payload));
     newImages?.forEach((img) => fd.append("images", img));
     if (video) fd.append("video", video);
     return apiClient.put<Product>(`/vendor/products/${id}`, fd, {
@@ -207,12 +230,12 @@ export const productApi = {
     apiClient.put<Product>(`/vendor/products/${id}/toggle-status`),
 };
 
-// ─── Categories API ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Categories API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const categoryApi = {
   list: () => apiClient.get<Category[]>("/categories"),
 };
 
-// ─── Analytics API ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Analytics API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const analyticsApi = {
   get: (params: {
     period?: "7d" | "30d" | "90d" | "1y";
@@ -239,7 +262,7 @@ export const analyticsApi = {
     apiClient.post("/vendor/marketplace-settings/reset"),
 };
 
-// ─── Payments API ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Payments API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const paymentApi = {
   getPayouts: (params: { page?: number; limit?: number; status?: string }) =>
     apiClient.get<PaginatedResponse<Payout>>("/vendor/payouts", { params }),
@@ -254,7 +277,7 @@ export const paymentApi = {
     }),
 };
 
-// ─── Notifications API ────────────────────────────────────────────────────────
+// â”€â”€â”€ Notifications API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const notificationApi = {
   list: (params: { page?: number; limit?: number; unread_only?: boolean }) =>
     apiClient.get<PaginatedResponse<Notification>>("/vendor/notifications", {
@@ -272,7 +295,7 @@ export const notificationApi = {
     apiClient.post("/vendor/notifications/fcm-token", { token }),
 };
 
-// ─── Dashboard API ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Dashboard API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const dashboardApi = {
   getOverview: () =>
     apiClient.get<{
@@ -288,7 +311,7 @@ export const dashboardApi = {
     }>("/vendor/dashboard"),
 };
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const publicApi = {
   getVendorPublicProfile: (vendorId: string) =>
     apiClient.get<{
@@ -352,3 +375,5 @@ export const publicApi = {
       total_vendors: number;
     }>("/public/showcase"),
 };
+
+

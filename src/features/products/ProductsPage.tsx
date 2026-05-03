@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import {
@@ -71,13 +71,12 @@ const ProductsPage: React.FC = () => {
     {
       key: 'name', label: 'Product',
       render: (_, row) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="product-img" style={{ background: 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-            {row.images[0] ? <img src={row.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '📦'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <div className="product-img product-img-placeholder" style={{ background: 'var(--surface3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {row.images[0] ? <img src={row.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span>No image</span>}
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div className="product-name">{row.name}</div>
-            <div className="product-sku">SKU: {row.sku}</div>
           </div>
         </div>
       ),
@@ -87,7 +86,7 @@ const ProductsPage: React.FC = () => {
       key: 'price', label: 'Price',
       render: (v, row) => (
         <div>
-          <div>₹{v?.toLocaleString()}</div>
+          <div>INR {v?.toLocaleString()}</div>
           {row.discount_percentage > 0 && (
             <div style={{ fontSize: 11, color: 'var(--green)' }}>-{row.discount_percentage}% off</div>
           )}
@@ -119,22 +118,22 @@ const ProductsPage: React.FC = () => {
 
   return (
     <div>
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="section-header">
         <div>
           <div className="section-title">Product Catalog</div>
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>{total} total products</div>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/products/new')}>
-          ＋ Add Product
+          Add Product
         </button>
       </div>
 
       <div className="card">
-        {/* ── Filters ── */}
+        {/* Filters */}
         <div className="filters-bar" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="filter-search">
-            <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>🔍</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>Search</span>
             <input
               placeholder="Search name, brand, description, tags..."
               value={filters.search}
@@ -274,14 +273,14 @@ const ProductsPage: React.FC = () => {
           )}
         </div>
 
-        {/* ── Table ── */}
+        {/* â”€â”€ Table â”€â”€ */}
         <DataTable<Product>
           columns={columns}
           data={items}
           loading={loading}
           rowKey="id"
           emptyText="No products found"
-          emptyIcon="📦"
+          emptyIcon="ðŸ“¦"
           selectedIds={selectedIds}
           onSelect={(id) => dispatch(selectId(id))}
           onSelectAll={() => dispatch(selectAll())}
@@ -291,7 +290,7 @@ const ProductsPage: React.FC = () => {
         <Pagination page={page} pages={pages} total={total} limit={filters.limit} onChange={(p) => dispatch(setPage(p))} />
       </div>
 
-      {/* ── Delete Confirm ── */}
+      {/* â”€â”€ Delete Confirm â”€â”€ */}
       <ConfirmDialog
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
@@ -303,7 +302,7 @@ const ProductsPage: React.FC = () => {
         loading={deleting}
       />
 
-      {/* ── Bulk Confirm ── */}
+      {/* â”€â”€ Bulk Confirm â”€â”€ */}
       <ConfirmDialog
         open={confirmBulk}
         onClose={() => setConfirmBulk(false)}
@@ -318,3 +317,5 @@ const ProductsPage: React.FC = () => {
 };
 
 export default ProductsPage;
+
+
