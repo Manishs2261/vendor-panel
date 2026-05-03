@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
-import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery } from './shopSlice';
+import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery, deleteGalleryImage } from './shopSlice';
 import { vendorApi, shopApi, productApi, dashboardApi, type VendorProfileResponse } from '../../api/services';
 import type { ShopForm } from '../../types';
 import toast from 'react-hot-toast';
@@ -65,15 +65,22 @@ const ShopPage: React.FC = () => {
 
   useEffect(() => {
     if (shop) {
-      setForm({
+      setForm((f) => ({
+        ...f,
         name: shop.name, description: shop.description, address: shop.address,
         city: shop.city, state: shop.state, postal_code: shop.postal_code,
-        business_type: shop.business_type, gst_number: shop.gst_number || '',
+        business_type: shop.business_type,
         contact_phone: shop.contact_phone, contact_email: shop.contact_email,
         latitude: shop.latitude, longitude: shop.longitude,
-      });
+      }));
     }
   }, [shop]);
+
+  useEffect(() => {
+    if (vendorProfile) {
+      setForm((f) => ({ ...f, gst_number: vendorProfile.gst_number || '' }));
+    }
+  }, [vendorProfile]);
 
   const set = (key: keyof ShopForm, value: any) => setForm((f: ShopForm) => ({ ...f, [key]: value }));
 
@@ -81,9 +88,12 @@ const ShopPage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     const payload = buildShopPayload(form) as any;
-    const result = shop
-      ? await dispatch(updateShop(payload))
-      : await dispatch(createShop(payload));
+    const [result] = await Promise.all([
+      shop ? dispatch(updateShop(payload)) : dispatch(createShop(payload)),
+      form.gst_number !== undefined
+        ? vendorApi.updateProfile({ gst_number: form.gst_number || undefined }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
     setSaving(false);
     if (createShop.fulfilled.match(result) || updateShop.fulfilled.match(result)) {
       toast.success(shop ? 'Shop updated!' : 'Shop created!');
@@ -94,58 +104,59 @@ const ShopPage: React.FC = () => {
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    // Create preview
     const reader = new FileReader();
-    reader.onload = (event) => {
-      setLogoPreview(event.target?.result as string);
-    };
+    reader.onload = (event) => setLogoPreview(event.target?.result as string);
     reader.readAsDataURL(file);
-    
     const result = await dispatch(uploadLogo(file));
+    setLogoPreview(null);
     if (uploadLogo.fulfilled.match(result)) {
+      await dispatch(fetchMyShop());
       toast.success('Logo uploaded!');
-      setLogoPreview(null); // Clear preview after successful upload
+    } else {
+      toast.error((result as any).payload as string || 'Logo upload failed');
     }
   };
 
   const handleBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    // Create preview
     const reader = new FileReader();
-    reader.onload = (event) => {
-      setBannerPreview(event.target?.result as string);
-    };
+    reader.onload = (event) => setBannerPreview(event.target?.result as string);
     reader.readAsDataURL(file);
-    
     const result = await dispatch(uploadBanner(file));
+    setBannerPreview(null);
     if (uploadBanner.fulfilled.match(result)) {
+      await dispatch(fetchMyShop());
       toast.success('Banner uploaded!');
-      setBannerPreview(null); // Clear preview after successful upload
+    } else {
+      toast.error((result as any).payload as string || 'Banner upload failed');
     }
   };
 
   const handleGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    
-    // Create previews for all selected files
-    const newPreviews: string[] = [];
     files.forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const preview = event.target?.result as string;
-        setGalleryPreviews(prev => [...prev, preview]);
-      };
+      reader.onload = (event) => setGalleryPreviews(prev => [...prev, event.target?.result as string]);
       reader.readAsDataURL(file);
     });
-    
     const result = await dispatch(uploadGallery(files));
+    setGalleryPreviews([]);
     if (uploadGallery.fulfilled.match(result)) {
+      await dispatch(fetchMyShop());
       toast.success('Gallery updated!');
-      setGalleryPreviews([]); // Clear previews after successful upload
+    } else {
+      toast.error((result as any).payload as string || 'Gallery upload failed');
+    }
+  };
+
+  const handleDeleteGallery = async (url: string) => {
+    const result = await dispatch(deleteGalleryImage(url));
+    if (deleteGalleryImage.fulfilled.match(result)) {
+      toast.success('Image removed');
+    } else {
+      toast.error((result as any).payload as string || 'Failed to remove image');
     }
   };
 
@@ -333,7 +344,29 @@ const ShopPage: React.FC = () => {
 
             <div className="card">
               <div className="card-header"><div className="card-title">Shop Banner</div></div>
-              <div style={{ height: 100, background: bannerPreview ? `url(${bannerPreview}) center/cover` : shop?.banner_url ? `url(${shop.banner_url}) center/cover` : 'var(--surface2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, fontSize: 28, cursor: 'pointer' }} onClick={() => bannerRef.current?.click()}>
+              <div
+                style={{
+                  height: 100,
+                  backgroundImage: bannerPreview
+                    ? `url('${bannerPreview}')`
+                    : shop?.banner_url
+                    ? `url('${shop.banner_url}')`
+                    : 'none',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundColor: 'var(--surface2)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 12,
+                  fontSize: 28,
+                  cursor: 'pointer',
+                }}
+                onClick={() => bannerRef.current?.click()}
+              >
                 {!bannerPreview && !shop?.banner_url && '🖼 Click to upload banner'}
               </div>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Recommended 1200×300px</p>
@@ -349,8 +382,23 @@ const ShopPage: React.FC = () => {
             <div className="image-grid">
               {/* Show existing gallery images */}
               {(shop?.gallery || []).map((url, i) => (
-                <div key={`existing-${i}`} className="image-item">
+                <div key={`existing-${i}`} className="image-item" style={{ position: 'relative' }}>
                   <img src={url} alt={`Gallery ${i}`} />
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteGallery(url)}
+                    style={{
+                      position: 'absolute', top: 4, right: 4,
+                      background: 'rgba(220,38,38,0.85)', color: 'white',
+                      border: 'none', borderRadius: '50%',
+                      width: 22, height: 22, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 'bold', lineHeight: 1,
+                    }}
+                    title="Remove image"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
               {/* Show preview images */}

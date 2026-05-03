@@ -113,6 +113,8 @@ export const authApi = {
 // â”€â”€â”€ Shop API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const vendorApi = {
   me: () => apiClient.get<VendorProfileResponse>("/vendor/me"),
+  updateProfile: (data: Partial<VendorProfileResponse>) =>
+    apiClient.put<VendorProfileResponse>("/vendor/me", data),
 };
 
 export const shopApi = {

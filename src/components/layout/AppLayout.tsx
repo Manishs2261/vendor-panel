@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logout } from '../../features/auth/authSlice';
+import { fetchMyShop } from '../../features/shop/shopSlice';
 
 const APP_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 const MARKETPLACE_URL = `${APP_BASE_URL}/marketplace`;
@@ -45,8 +46,11 @@ const AppLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const vendor = useAppSelector((s) => s.auth.vendor);
+  const shopLogo = useAppSelector((s) => s.shop?.data?.logo_url);
   const unreadCount = useAppSelector((s) => s.notifications?.unreadCount ?? 0);
   const pageInfo = PAGE_TITLES[location.pathname] || { title: 'Vendor Panel', sub: 'LocalShop' };
+
+  useEffect(() => { dispatch(fetchMyShop()); }, [dispatch]);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -110,8 +114,10 @@ const AppLayout: React.FC = () => {
 
         <div className="sidebar-footer">
           <div className="vendor-card">
-            <div className="vendor-avatar">
-              {vendor?.name?.charAt(0).toUpperCase() || 'V'}
+            <div className="vendor-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+              {shopLogo
+                ? <img src={shopLogo} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : vendor?.name?.charAt(0).toUpperCase() || 'V'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="vendor-name">{vendor?.name || 'Vendor'}</div>
