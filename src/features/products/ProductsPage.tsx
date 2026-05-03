@@ -79,23 +79,42 @@ const ProductsPage: React.FC = () => {
             <div className="product-name">{row.name}</div>
           </div>
           <div className="product-hover-card">
-            <div className="product-hover-media">
-              {row.images[0] ? <img src={row.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span>No image</span>}
+            {/* All images strip */}
+            <div className="product-hover-images">
+              {row.images?.length > 0
+                ? row.images.map((img, i) => <img key={i} src={img} alt="" className="product-hover-thumb" />)
+                : <div className="product-hover-no-img">No image</div>
+              }
             </div>
-            <div className="product-hover-content">
+            <div className="product-hover-body">
+              {/* Title + status */}
               <div className="product-hover-title-row">
                 <div className="product-hover-title">{row.name}</div>
                 <StatusBadge status={row.status} />
               </div>
-              <div className="product-hover-meta">{row.category_name || 'Uncategorized'}</div>
+              {/* Category › Subcategory */}
+              <div className="product-hover-meta">
+                {row.category_name || 'Uncategorized'}
+                {(row as any).subcategory_name ? <> &rsaquo; {(row as any).subcategory_name}</> : null}
+              </div>
+              <hr className="product-hover-divider" />
+              {/* Pricing */}
+              <div className="product-hover-pricing">
+                <span className="product-hover-price-main">
+                  INR {(row.discount_percentage > 0 && row.discounted_price ? row.discounted_price : row.price)?.toLocaleString?.()}
+                </span>
+                {row.discount_percentage > 0 && (
+                  <>
+                    <span className="product-hover-price-original">INR {row.price?.toLocaleString?.()}</span>
+                    <span className="product-hover-price-discount">-{row.discount_percentage}% off</span>
+                  </>
+                )}
+              </div>
+              {/* Stats grid */}
               <div className="product-hover-grid">
                 <div>
-                  <span className="product-hover-label">Price</span>
-                  <strong>INR {row.price?.toLocaleString?.() ?? row.price}</strong>
-                </div>
-                <div>
                   <span className="product-hover-label">Stock</span>
-                  <strong>{row.stock ?? 0}</strong>
+                  <strong style={{ color: (row.stock ?? 0) < 5 ? 'var(--red)' : 'inherit' }}>{row.stock ?? 0}</strong>
                 </div>
                 <div>
                   <span className="product-hover-label">Clicks</span>
@@ -105,14 +124,57 @@ const ProductsPage: React.FC = () => {
                   <span className="product-hover-label">Searches</span>
                   <strong>{row.search_count ?? 0}</strong>
                 </div>
+                {row.brand && (
+                  <div>
+                    <span className="product-hover-label">Brand</span>
+                    <strong>{row.brand}</strong>
+                  </div>
+                )}
+                {row.sku && (
+                  <div style={{ gridColumn: row.brand ? 'auto' : 'span 2' }}>
+                    <span className="product-hover-label">SKU</span>
+                    <strong style={{ fontFamily: 'monospace', fontSize: 11 }}>{row.sku}</strong>
+                  </div>
+                )}
               </div>
-              <div className="product-hover-description">{row.description || 'No description added yet.'}</div>
-              <div className="product-hover-tags">
-                {row.tags?.length ? row.tags.slice(0, 6).map((tag) => (
-                  <span key={tag} className="product-hover-tag">{tag}</span>
-                )) : <span className="product-hover-empty">No tags</span>}
+              {/* Color variations */}
+              {row.variations?.length > 0 && (
+                <div>
+                  <hr className="product-hover-divider" />
+                  <div className="product-hover-section-label" style={{ marginTop: 8 }}>
+                    Color Variations ({row.variations.length})
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {row.variations.map((v) => (
+                      <div key={v.color} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 13, height: 13, borderRadius: '50%', background: v.hex, border: '1.5px solid rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{v.color} ({v.stock})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <hr className="product-hover-divider" />
+              {/* Full description */}
+              <div>
+                <div className="product-hover-section-label">Description</div>
+                <div className="product-hover-description">{row.description || <span className="product-hover-empty">No description added yet.</span>}</div>
               </div>
-              <div className="product-hover-footer">Updated: {formatDateTime(row.updated_at || row.created_at)}</div>
+              {/* All tags */}
+              <div>
+                <div className="product-hover-section-label">Tags</div>
+                <div className="product-hover-tags">
+                  {row.tags?.length
+                    ? row.tags.map((tag) => <span key={tag} className="product-hover-tag">{tag}</span>)
+                    : <span className="product-hover-empty">No tags</span>
+                  }
+                </div>
+              </div>
+              {/* Footer: both dates */}
+              <div className="product-hover-footer">
+                <span>Created: {formatDateTime(row.created_at)}</span>
+                <span>Updated: {formatDateTime(row.updated_at || row.created_at)}</span>
+              </div>
             </div>
           </div>
         </div>
