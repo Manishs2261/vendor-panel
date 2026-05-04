@@ -9,6 +9,8 @@ import type {
   Payout,
   CommissionInfo,
   Notification,
+  Review,
+  ReviewStats,
   PaginatedResponse,
   ShopForm,
   ProductForm,
@@ -315,6 +317,15 @@ export const dashboardApi = {
       recent_products: Product[];
       completion_score: number;
     }>("/vendor/dashboard"),
+};
+
+// â”€â”€â”€ Reviews API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export const reviewApi = {
+  list: (params: { page?: number; limit?: number; rating?: number; product_id?: string; search?: string }) =>
+    apiClient.get<PaginatedResponse<Review>>('/vendor/reviews', { params }),
+
+  stats: () =>
+    apiClient.get<ReviewStats>('/vendor/reviews/stats'),
 };
 
 // â”€â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

@@ -6,6 +6,7 @@ import analyticsReducer from '../features/analytics/analyticsSlice';
 import paymentReducer from '../features/payments/paymentSlice';
 import notificationReducer from '../features/notifications/notificationSlice';
 import dashboardReducer from '../features/dashboard/dashboardSlice';
+import reviewReducer from '../features/reviews/reviewSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     payments: paymentReducer,
     notifications: notificationReducer,
     dashboard: dashboardReducer,
+    reviews: reviewReducer,
   },
 });
 

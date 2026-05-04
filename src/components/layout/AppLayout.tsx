@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, Settings, LogOut } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logout } from '../../features/auth/authSlice';
 import { fetchMyShop } from '../../features/shop/shopSlice';
@@ -12,6 +13,12 @@ const NAV = [
       { to: '/products', icon: 'P', label: 'Products' },
       { to: '/analytics', icon: 'A', label: 'Analytics' },
       { to: '/marketplace', icon: 'M', label: 'Marketplace' },
+    ],
+  },
+  {
+    group: 'Feedback',
+    items: [
+      { to: '/reviews', icon: 'R', label: 'Reviews' },
     ],
   },
   {
@@ -37,6 +44,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/settings': { title: 'Settings', sub: 'Account access and session controls' },
   '/marketplace': { title: 'Marketplace', sub: 'Your live storefront' },
   '/marketplace/settings': { title: 'Storefront Editor', sub: 'Customize, preview and publish your store' },
+  '/reviews': { title: 'Reviews', sub: 'Customer feedback across your product catalog' },
 };
 
 const AppLayout: React.FC = () => {
@@ -101,7 +109,7 @@ const AppLayout: React.FC = () => {
               <div className="vendor-email">{vendor?.email || ''}</div>
             </div>
             <button className="logout-btn" onClick={handleLogout} title="Logout">
-              X
+              <LogOut size={15} strokeWidth={1.8} />
             </button>
           </div>
         </div>
@@ -115,15 +123,13 @@ const AppLayout: React.FC = () => {
           </div>
 
           <div className="header-right">
-            <div className="search-box">
-              <span style={{ color: 'var(--text-dim)', fontSize: 14 }}>S</span>
-              <input placeholder="Search products..." />
-            </div>
-            <button className="icon-btn" onClick={() => navigate('/notifications')}>
-              N
+            <button className="icon-btn" onClick={() => navigate('/notifications')} title="Notifications">
+              <Bell size={17} strokeWidth={1.8} />
               {unreadCount > 0 && <span className="notif-dot" />}
             </button>
-            <button className="icon-btn" onClick={() => navigate('/settings')}>T</button>
+            <button className="icon-btn" onClick={() => navigate('/settings')} title="Settings">
+              <Settings size={17} strokeWidth={1.8} />
+            </button>
           </div>
         </header>
 

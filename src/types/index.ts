@@ -131,6 +131,24 @@ export interface Notification {
   created_at: string;
 }
 
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+export interface Review {
+  id: string;
+  product_id: string;
+  product_name: string;
+  product_image?: string;
+  reviewer_name: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
+
+export interface ReviewStats {
+  average_rating: number;
+  total_reviews: number;
+  breakdown: Record<string, number>; // "1" → count, "2" → count, …
+}
+
 // ─── API ─────────────────────────────────────────────────────────────────────
 export interface PaginatedResponse<T> { items: T[]; total: number; page: number; pages: number; limit: number; }
 export interface AsyncState<T> { data: T | null; loading: boolean; error: string | null; }
