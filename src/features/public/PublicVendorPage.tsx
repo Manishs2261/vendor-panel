@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { publicApi } from '../../api/services';
 
@@ -67,6 +67,34 @@ const storefrontToFlat = (s: any): MarketplaceSettings => ({
   banner_slides: s?.banner?.slides || [],
 });
 
+const _PH_PALETTES = [
+  { bg: 'linear-gradient(145deg,#f5efe6 0%,#ede2d0 100%)', color: '#c8a96e' },
+  { bg: 'linear-gradient(145deg,#e8f0e8 0%,#cde8cd 100%)', color: '#2d6a4f' },
+  { bg: 'linear-gradient(145deg,#e8eef5 0%,#ccdced 100%)', color: '#1a3d5c' },
+  { bg: 'linear-gradient(145deg,#f5e8e8 0%,#f0d2d2 100%)', color: '#8b3a3a' },
+  { bg: 'linear-gradient(145deg,#f0eaf5 0%,#e0d0ed 100%)', color: '#6b3d8b' },
+];
+const _getInitials = (name: string) =>
+  name.trim().split(/\s+/).slice(0, 2).map((w) => w[0] || '').join('').toUpperCase() || '?';
+const _getPH = (name: string) => _PH_PALETTES[(name.charCodeAt(0) || 0) % _PH_PALETTES.length];
+
+const ProductPlaceholder: React.FC<{ name: string; category: string; size?: 'sm' | 'lg' }> = ({ name, category, size = 'sm' }) => {
+  const ph = _getPH(name);
+  const initials = _getInitials(name);
+  const ring = size === 'lg' ? 72 : 52;
+  const fs = size === 'lg' ? 28 : 20;
+  return (
+    <div style={{ width: '100%', height: '100%', background: ph.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+      <div style={{ width: ring, height: ring, borderRadius: '50%', background: `${ph.color}18`, border: `2px solid ${ph.color}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Playfair Display', serif", fontSize: fs, color: ph.color, fontWeight: 600, letterSpacing: '0.04em', flexShrink: 0 }}>
+        {initials}
+      </div>
+      <div style={{ fontSize: 9.5, color: ph.color, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 500, opacity: 0.7, textAlign: 'center', padding: '0 8px' }}>
+        {category || 'Product'}
+      </div>
+    </div>
+  );
+};
+
 interface PublicVendorData {
   vendor: {
     id: string;
@@ -119,6 +147,25 @@ const PublicVendorPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [liked, setLiked] = useState<Set<string>>(new Set());
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [modalImg, setModalImg] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [viewAll, setViewAll] = useState(false);
+  const [displayCount, setDisplayCount] = useState(12);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const toggleLike = (id: string) =>
+    setLiked((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const openProduct = (p: any) => { setSelectedProduct(p); setModalImg(0); };
+  const closeProduct = () => setSelectedProduct(null);
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Reset pagination when switching views
+  useEffect(() => { setDisplayCount(12); }, [activeCategory, viewAll]);
 
   const [previewSettings, setPreviewSettings] = useState<MarketplaceSettings | null>(() => {
     const previewKey = new URLSearchParams(location.search).get('preview');
@@ -224,6 +271,17 @@ const PublicVendorPage: React.FC = () => {
     return () => { document.title = 'LocalShop'; };
   }, [metaTitle]);
 
+  // Infinite scroll sentinel
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setDisplayCount((c) => c + 12);
+    }, { rootMargin: '200px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: "'DM Sans', sans-serif", color: '#6b5c45' }}>
@@ -260,12 +318,25 @@ const PublicVendorPage: React.FC = () => {
   const heroTitle = settings?.banner_text?.trim() || brandName;
   const productsPerRow = settings?.products_per_row || 4;
   const activeProducts = products
-    .filter((product) => product.status === 'ACTIVE' || product.status === 'approved');
+    .filter((product) => product.status?.toLowerCase() === 'active');
+  const filteredProducts = activeCategory
+    ? activeProducts.filter((p) => p.category_name === activeCategory)
+    : activeProducts;
+  const isPaginatedView = viewAll || !!activeCategory;
+  // Normal home view slices (used only when !isPaginatedView)
   const featuredProducts = activeProducts.slice(0, productsPerRow);
   const recentProducts = activeProducts.slice(productsPerRow, productsPerRow * 2).length > 0
     ? activeProducts.slice(productsPerRow, productsPerRow * 2)
     : activeProducts.slice(0, productsPerRow);
-  const categories = Array.from(new Set(activeProducts.map((product) => product.category_name).filter(Boolean))).slice(0, 10);
+  const categories = Object.values(
+    activeProducts.reduce((acc, p) => {
+      if (!p.category_name) return acc;
+      if (!acc[p.category_name]) acc[p.category_name] = { name: p.category_name, count: 0, image: '' };
+      acc[p.category_name].count += 1;
+      if (!acc[p.category_name].image && p.images?.[0]) acc[p.category_name].image = p.images[0];
+      return acc;
+    }, {} as Record<string, { name: string; count: number; image: string }>)
+  ).slice(0, 6);
   const addressText = [shop?.address, shop?.city, shop?.state, shop?.postal_code].filter(Boolean).join(', ');
   const supportLine = shop?.contact_email || vendor.business_email || 'support@localshop.in';
   const workingDays = shop?.working_days && shop.working_days.length > 0 ? shop.working_days.join(' / ') : 'Mon-Sat';
@@ -378,10 +449,12 @@ const PublicVendorPage: React.FC = () => {
         .vp-section-title{font-family:'Playfair Display',serif;font-size:24px;color:${darkColor}}
         .vp-see-all{font-size:12px;color:${accentColor};cursor:pointer;letter-spacing:0.06em;font-weight:500}
         .vp-category-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:40px}
-        .vp-cat-card{background:white;border-radius:12px;padding:20px 12px;text-align:center;border:1px solid ${lightColor};transition:all 0.2s}
+        .vp-cat-card{background:white;border-radius:12px;padding:14px 10px;text-align:center;border:1px solid ${lightColor};transition:all 0.2s;display:flex;flex-direction:column;align-items:center;gap:8px}
         .vp-cat-card:hover{border-color:${accentColor};transform:translateY(-2px);box-shadow:0 6px 20px rgba(200,169,110,0.12)}
-        .vp-cat-icon{font-size:28px;margin-bottom:10px;display:block}
-        .vp-cat-name{font-size:12px;color:${midColor};font-weight:500}
+        .vp-cat-thumb{width:56px;height:56px;border-radius:10px;object-fit:cover;background:${warmColor};flex-shrink:0}
+        .vp-cat-thumb-placeholder{width:56px;height:56px;border-radius:10px;background:${warmColor};display:flex;align-items:center;justify-content:center;font-size:22px}
+        .vp-cat-name{font-size:12px;color:${darkColor};font-weight:600;line-height:1.3}
+        .vp-cat-count{font-size:10.5px;color:${midColor}}
         .vp-product-grid{display:grid;grid-template-columns:repeat(${productsPerRow},1fr);gap:18px;margin-bottom:40px}
         .vp-product-card{background:white;border-radius:14px;overflow:hidden;border:1px solid ${lightColor};transition:all 0.22s;cursor:pointer}
         .vp-product-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,0.08)}
@@ -391,12 +464,40 @@ const PublicVendorPage: React.FC = () => {
         .vp-product-badge.new{background:#2d6a4f}
         .vp-product-info{padding:14px}
         .vp-product-name{font-size:13px;font-weight:500;color:${darkColor};margin-bottom:4px;line-height:1.4}
-        .vp-product-desc{font-size:11px;color:${midColor};margin-bottom:10px;line-height:1.5}
+        .vp-product-desc{font-size:11px;color:${midColor};margin-bottom:10px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .vp-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;display:flex;align-items:flex-end;justify-content:center;padding:0}
+        @media(min-width:640px){.vp-modal-overlay{align-items:center;padding:24px}}
+        .vp-modal{background:white;width:100%;max-width:860px;max-height:92vh;border-radius:20px 20px 0 0;overflow-y:auto;position:relative;animation:vpSlideUp 0.28s ease}
+        @media(min-width:640px){.vp-modal{border-radius:20px}}
+        @keyframes vpSlideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+        @keyframes vpSpin{to{transform:rotate(360deg)}}
+        .vp-modal-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;background:${warmColor};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:${darkColor};z-index:10;transition:background 0.2s}
+        .vp-modal-close:hover{background:${lightColor}}
+        .vp-modal-body{display:grid;grid-template-columns:1fr;gap:0}
+        @media(min-width:640px){.vp-modal-body{grid-template-columns:1fr 1fr}}
+        .vp-modal-gallery{background:${warmColor};border-radius:20px 20px 0 0;overflow:hidden;min-height:280px;display:flex;flex-direction:column}
+        @media(min-width:640px){.vp-modal-gallery{border-radius:20px 0 0 20px;min-height:400px}}
+        .vp-modal-main-img{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:220px}
+        .vp-modal-main-img img{width:100%;height:100%;object-fit:cover}
+        .vp-modal-thumbs{display:flex;gap:6px;padding:10px;overflow-x:auto;background:white;border-top:1px solid ${lightColor}}
+        .vp-modal-thumb{width:52px;height:52px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:border-color 0.15s}
+        .vp-modal-thumb.active{border-color:${accentColor}}
+        .vp-modal-details{padding:24px;display:flex;flex-direction:column;gap:12px}
+        .vp-modal-cat{font-size:10.5px;color:${accentColor};font-weight:600;letter-spacing:0.12em;text-transform:uppercase}
+        .vp-modal-name{font-family:'Playfair Display',serif;font-size:22px;color:${darkColor};line-height:1.25}
+        .vp-modal-price{font-size:24px;font-weight:700;color:${darkColor}}
+        .vp-modal-price-old{font-size:13px;color:${midColor};text-decoration:line-through;margin-left:8px}
+        .vp-modal-badge{display:inline-block;background:${accentColor};color:white;font-size:10px;padding:2px 10px;border-radius:12px;font-weight:600;margin-left:8px}
+        .vp-modal-desc{font-size:13px;color:${midColor};line-height:1.7}
+        .vp-modal-meta{display:flex;flex-wrap:wrap;gap:8px}
+        .vp-modal-tag{background:${warmColor};border:1px solid ${lightColor};border-radius:8px;padding:4px 10px;font-size:11px;color:${midColor}}
+        .vp-modal-divider{border:none;border-top:1px solid ${lightColor};margin:0}
         .vp-product-footer{display:flex;align-items:center;justify-content:space-between;gap:10px}
         .vp-price{font-size:16px;font-weight:600;color:${darkColor}}
         .vp-price-old{font-size:11px;color:${midColor};text-decoration:line-through;margin-left:4px}
-        .vp-add-btn{background:${darkColor};color:white;border:none;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;transition:background 0.2s}
-        .vp-add-btn:hover{background:${accentColor}}
+        .vp-like-btn{width:32px;height:32px;border-radius:50%;background:white;border:1.5px solid ${lightColor};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+        .vp-like-btn:hover{border-color:${accentColor};transform:scale(1.12)}
+        .vp-like-btn.liked{background:${accentColor};border-color:${accentColor}}
         .vp-banner-strip{background:${darkColor};padding:28px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:14px;margin-bottom:40px;gap:16px}
         .vp-banner-text h3{font-family:'Playfair Display',serif;font-size:20px;color:white;margin-bottom:6px}
         .vp-banner-text p{font-size:12px;color:rgba(255,255,255,0.6)}
@@ -407,7 +508,8 @@ const PublicVendorPage: React.FC = () => {
         .vp-stars{color:${accentColor};font-size:12px}
         .vp-rating-count{font-size:10px;color:${midColor}}
         .vp-empty-block{background:white;border:1px solid ${lightColor};border-radius:14px;padding:28px;color:${midColor};margin-bottom:40px}
-        .vp-about{background:white;border:1px solid ${lightColor};border-radius:14px;padding:28px 32px;margin-bottom:40px;display:flex;gap:20px;align-items:flex-start}
+        .vp-about{background:white;border:1px solid ${lightColor};border-radius:14px;padding:28px 32px;margin-bottom:40px;display:flex;gap:20px;align-items:flex-start;scroll-margin-top:120px}
+        #vp-social{scroll-margin-top:120px}
         .vp-about-icon{font-size:32px;flex-shrink:0;margin-top:2px}
         .vp-about-title{font-family:'Playfair Display',serif;font-size:17px;color:${darkColor};margin-bottom:8px}
         .vp-about-text{font-size:13px;color:${midColor};line-height:1.7}
@@ -477,12 +579,25 @@ const PublicVendorPage: React.FC = () => {
       </header>
 
       <nav className="vp-nav">
-        <div className="vp-nav-item active">All</div>
-        {categories.map((category) => (
-          <div key={category} className="vp-nav-item">{category}</div>
+        <div
+          className={`vp-nav-item${activeCategory === null ? ' active' : ''}`}
+          onClick={() => setActiveCategory(null)}
+        >All</div>
+        {categories.map((cat) => (
+          <div
+            key={cat.name}
+            className={`vp-nav-item${activeCategory === cat.name ? ' active' : ''}`}
+            onClick={() => setActiveCategory(cat.name)}
+          >{cat.name}</div>
         ))}
-        {socialLinks.length > 0 && <div className="vp-nav-item">Social</div>}
-        <div className="vp-nav-item">About</div>
+        <div
+          className={`vp-nav-item${viewAll && !activeCategory ? ' active' : ''}`}
+          onClick={() => { setViewAll(true); setActiveCategory(null); }}
+        >View All</div>
+        {socialLinks.length > 0 && (
+          <div className="vp-nav-item" onClick={() => scrollTo('vp-social')}>Social</div>
+        )}
+        <div className="vp-nav-item" onClick={() => scrollTo('vp-about')}>About</div>
       </nav>
 
       <div className="vp-carousel">
@@ -527,128 +642,241 @@ const PublicVendorPage: React.FC = () => {
       </div>
 
       <main className="vp-main">
-        <div className="vp-section-header">
-          <h2 className="vp-section-title">Shop by Category</h2>
-          <span className="vp-see-all">View All &rarr;</span>
-        </div>
-        <div className="vp-category-grid">
-          {(categories.length > 0 ? categories : ['Featured', 'Popular', 'Seasonal', 'New']).slice(0, 6).map((category, index) => (
-            <div key={category} className="vp-cat-card">
-              <span className="vp-cat-icon">{['🧵', '🏺', '💍', '🌿', '🪔', '👜'][index % 6]}</span>
-              <div className="vp-cat-name">{category}</div>
+        {categories.length > 0 && (
+          <>
+            <div className="vp-section-header">
+              <h2 className="vp-section-title">Shop by Category</h2>
+              <span className="vp-see-all">View All &rarr;</span>
             </div>
-          ))}
-        </div>
-
-        {settings?.about_text && (
-          <div className="vp-about">
-            <span className="vp-about-icon">🏪</span>
-            <div>
-              <div className="vp-about-title">About {brandName}</div>
-              <div className="vp-about-text">{settings.about_text}</div>
+            <div className="vp-category-grid">
+              {categories.map((cat) => (
+                <div key={cat.name} className="vp-cat-card">
+                  {cat.image
+                    ? <img src={cat.image} alt={cat.name} className="vp-cat-thumb" />
+                    : <div className="vp-cat-thumb-placeholder">🛍</div>}
+                  <div className="vp-cat-name">{cat.name}</div>
+                  <div className="vp-cat-count">{cat.count} {cat.count === 1 ? 'product' : 'products'}</div>
+                </div>
+              ))}
             </div>
-          </div>
+          </>
         )}
 
-        <div className="vp-section-header">
-          <h2 className="vp-section-title">Featured Products</h2>
-          <span className="vp-see-all">See All &rarr;</span>
-        </div>
-        {featuredProducts.length > 0 ? (
-          <div className="vp-product-grid">
-            {featuredProducts.map((product, index) => (
-              <article key={product.id} className="vp-product-card">
-                <div className="vp-product-img">
-                  <div className={`vp-product-badge ${index === 1 ? 'new' : ''}`}>
-                    {product.discount_percentage > 0 ? 'Sale' : index === 1 ? 'New' : 'Featured'}
-                  </div>
-                  {product.images[0] ? (
-                    <img src={product.images[0]} alt={product.name} />
-                  ) : (
-                    <div style={{ fontSize: 56, color: accentColor, fontFamily: "'Playfair Display', serif" }}>
-                      {product.name.slice(0, 1).toUpperCase()}
-                    </div>
-                  )}
+        <div id="vp-about" className="vp-about">
+          <span className="vp-about-icon">🏪</span>
+          <div style={{ flex: 1 }}>
+            <div className="vp-about-title">About {brandName}</div>
+            <div className="vp-about-text">
+              {settings?.about_text || tagline || `${brandName} offers a curated selection of quality products delivered with care and passion.`}
+            </div>
+            <div style={{ display: 'flex', gap: 24, marginTop: 14, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#1a1208' }}>{activeProducts.length}</span>
+                <span style={{ fontSize: 11, color: '#6b5c45' }}>Products</span>
+              </div>
+              {averageRating > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#1a1208' }}>{averageRating.toFixed(1)} ★</span>
+                  <span style={{ fontSize: 11, color: '#6b5c45' }}>Avg Rating</span>
                 </div>
-                <div className="vp-product-info">
-                  {settings?.show_ratings !== false && (
-                    <div className="vp-rating">
-                      <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 5)))}</span>
-                      <span className="vp-rating-count">({product.review_count || 24})</span>
-                    </div>
-                  )}
-                  <div className="vp-product-name">{product.name}</div>
-                  <div className="vp-product-desc">{product.description || `${product.category_name || 'Store'} highlight from ${brandName}`}</div>
-                  <div className="vp-product-footer">
-                    <div>
-                      <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
-                      {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
-                    </div>
-                    <button className="vp-add-btn">+ Add</button>
-                  </div>
+              )}
+              {overallReviews > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#1a1208' }}>{overallReviews}</span>
+                  <span style={{ fontSize: 11, color: '#6b5c45' }}>Reviews</span>
                 </div>
-              </article>
-            ))}
+              )}
+              {vendor.verified && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#2d6a4f' }}>✓</span>
+                  <span style={{ fontSize: 11, color: '#6b5c45' }}>Verified</span>
+                </div>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="vp-empty-block">Featured products will appear here once this vendor adds them.</div>
-        )}
-
-        <div className="vp-banner-strip">
-          <div className="vp-banner-text">
-            <h3>{settings?.promo_headline || (vendor.verified ? 'Verified Seller, Premium Experience' : 'Discover This Local Business')}</h3>
-            <p>{settings?.promo_subtext || addressText || 'Trusted storefront with curated products and direct vendor contact.'}</p>
-          </div>
-          <a
-            href={settings?.promo_cta_link || (settings?.whatsapp_number ? `https://wa.me/${String(settings.whatsapp_number).replace(/\D/g, '')}` : `mailto:${supportLine}`)}
-            className="vp-banner-cta"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {settings?.promo_cta_label || 'Contact Vendor'}
-          </a>
         </div>
 
-        <div className="vp-section-header">
-          <h2 className="vp-section-title">Recently Added</h2>
-          <span className="vp-see-all">See All &rarr;</span>
-        </div>
-        {recentProducts.length > 0 ? (
-          <div className="vp-product-grid">
-            {recentProducts.map((product, index) => (
-              <article key={product.id} className="vp-product-card">
-                <div className="vp-product-img">
-                  {index === 0 && <div className="vp-product-badge new">New</div>}
-                  {product.images[0] ? (
-                    <img src={product.images[0]} alt={product.name} />
-                  ) : (
-                    <div style={{ fontSize: 56, color: accentColor, fontFamily: "'Playfair Display', serif" }}>
-                      {product.name.slice(0, 1).toUpperCase()}
-                    </div>
-                  )}
+        {isPaginatedView ? (
+          /* ── Paginated "View All / Category" view ── */
+          <>
+            <div className="vp-section-header">
+              <h2 className="vp-section-title">
+                {activeCategory || 'All Products'}
+                <span style={{ fontSize: 13, color: '#6b5c45', fontWeight: 400, marginLeft: 10 }}>
+                  ({filteredProducts.length})
+                </span>
+              </h2>
+              <span
+                className="vp-see-all"
+                onClick={() => { setViewAll(false); setActiveCategory(null); }}
+              >← Back</span>
+            </div>
+            {filteredProducts.length > 0 ? (
+              <>
+                <div className="vp-product-grid">
+                  {filteredProducts.slice(0, displayCount).map((product) => (
+                    <article key={product.id} className="vp-product-card" onClick={() => openProduct(product)}>
+                      <div className="vp-product-img">
+                        {product.discount_percentage > 0 && <div className="vp-product-badge">Sale</div>}
+                        {product.images[0]
+                          ? <img src={product.images[0]} alt={product.name} />
+                          : <ProductPlaceholder name={product.name} category={product.category_name} />}
+                      </div>
+                      <div className="vp-product-info">
+                        {settings?.show_ratings !== false && (
+                          <div className="vp-rating">
+                            <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 5)))}</span>
+                            <span className="vp-rating-count">({product.review_count || 24})</span>
+                          </div>
+                        )}
+                        <div className="vp-product-name">{product.name}</div>
+                        <div className="vp-product-desc">{product.description || `${product.category_name || 'Store'} product from ${brandName}`}</div>
+                        <div className="vp-product-footer">
+                          <div>
+                            <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
+                            {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
+                          </div>
+                          <button
+                            className={`vp-like-btn${liked.has(product.id) ? ' liked' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); toggleLike(product.id); }}
+                            title={liked.has(product.id) ? 'Unlike' : 'Like'}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill={liked.has(product.id) ? 'white' : 'none'} stroke={liked.has(product.id) ? 'white' : '#c8a96e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
                 </div>
-                <div className="vp-product-info">
-                  {settings?.show_ratings !== false && (
-                    <div className="vp-rating">
-                      <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 4)))}</span>
-                      <span className="vp-rating-count">({product.review_count || 18})</span>
-                    </div>
-                  )}
-                  <div className="vp-product-name">{product.name}</div>
-                  <div className="vp-product-desc">{product.description || `Freshly added to the ${brandName} storefront.`}</div>
-                  <div className="vp-product-footer">
-                    <div>
-                      <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
-                      {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
-                    </div>
-                    <button className="vp-add-btn">+ Add</button>
+                {displayCount < filteredProducts.length ? (
+                  <div ref={sentinelRef} style={{ textAlign: 'center', padding: '28px 0', color: '#6b5c45', fontSize: 12 }}>
+                    <span style={{ display: 'inline-block', width: 20, height: 20, border: '2px solid #c8a96e', borderTopColor: 'transparent', borderRadius: '50%', animation: 'vpSpin 0.7s linear infinite', verticalAlign: 'middle', marginRight: 8 }} />
+                    Loading more products…
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '16px 0 32px', color: '#6b5c45', fontSize: 12 }}>
+                    All {filteredProducts.length} products shown
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="vp-empty-block">No products found{activeCategory ? ` in "${activeCategory}"` : ''}.</div>
+            )}
+          </>
         ) : (
-          <div className="vp-empty-block">More recent products and services will show here as inventory grows.</div>
+          /* ── Normal home view: Featured + Promo + Recently Added ── */
+          <>
+            <div className="vp-section-header">
+              <h2 className="vp-section-title">Featured Products</h2>
+              <span className="vp-see-all" onClick={() => setViewAll(true)}>See All &rarr;</span>
+            </div>
+            {featuredProducts.length > 0 ? (
+              <div className="vp-product-grid">
+                {featuredProducts.map((product, index) => (
+                  <article key={product.id} className="vp-product-card" onClick={() => openProduct(product)}>
+                    <div className="vp-product-img">
+                      <div className={`vp-product-badge ${index === 1 ? 'new' : ''}`}>
+                        {product.discount_percentage > 0 ? 'Sale' : index === 1 ? 'New' : 'Featured'}
+                      </div>
+                      {product.images[0]
+                        ? <img src={product.images[0]} alt={product.name} />
+                        : <ProductPlaceholder name={product.name} category={product.category_name} />}
+                    </div>
+                    <div className="vp-product-info">
+                      {settings?.show_ratings !== false && (
+                        <div className="vp-rating">
+                          <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 5)))}</span>
+                          <span className="vp-rating-count">({product.review_count || 24})</span>
+                        </div>
+                      )}
+                      <div className="vp-product-name">{product.name}</div>
+                      <div className="vp-product-desc">{product.description || `${product.category_name || 'Store'} highlight from ${brandName}`}</div>
+                      <div className="vp-product-footer">
+                        <div>
+                          <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
+                          {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
+                        </div>
+                        <button
+                          className={`vp-like-btn${liked.has(product.id) ? ' liked' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleLike(product.id); }}
+                          title={liked.has(product.id) ? 'Unlike' : 'Like'}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill={liked.has(product.id) ? 'white' : 'none'} stroke={liked.has(product.id) ? 'white' : '#c8a96e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="vp-empty-block">Featured products will appear here once this vendor adds them.</div>
+            )}
+
+            <div className="vp-banner-strip">
+              <div className="vp-banner-text">
+                <h3>{settings?.promo_headline || (vendor.verified ? 'Verified Seller, Premium Experience' : 'Discover This Local Business')}</h3>
+                <p>{settings?.promo_subtext || addressText || 'Trusted storefront with curated products and direct vendor contact.'}</p>
+              </div>
+              <a
+                href={settings?.promo_cta_link || (settings?.whatsapp_number ? `https://wa.me/${String(settings.whatsapp_number).replace(/\D/g, '')}` : `mailto:${supportLine}`)}
+                className="vp-banner-cta"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {settings?.promo_cta_label || 'Contact Vendor'}
+              </a>
+            </div>
+
+            <div className="vp-section-header">
+              <h2 className="vp-section-title">Recently Added</h2>
+              <span className="vp-see-all" onClick={() => setViewAll(true)}>See All &rarr;</span>
+            </div>
+            {recentProducts.length > 0 ? (
+              <div className="vp-product-grid">
+                {recentProducts.map((product, index) => (
+                  <article key={product.id} className="vp-product-card" onClick={() => openProduct(product)}>
+                    <div className="vp-product-img">
+                      {index === 0 && <div className="vp-product-badge new">New</div>}
+                      {product.images[0]
+                        ? <img src={product.images[0]} alt={product.name} />
+                        : <ProductPlaceholder name={product.name} category={product.category_name} />}
+                    </div>
+                    <div className="vp-product-info">
+                      {settings?.show_ratings !== false && (
+                        <div className="vp-rating">
+                          <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 4)))}</span>
+                          <span className="vp-rating-count">({product.review_count || 18})</span>
+                        </div>
+                      )}
+                      <div className="vp-product-name">{product.name}</div>
+                      <div className="vp-product-desc">{product.description || `Freshly added to the ${brandName} storefront.`}</div>
+                      <div className="vp-product-footer">
+                        <div>
+                          <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
+                          {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
+                        </div>
+                        <button
+                          className={`vp-like-btn${liked.has(product.id) ? ' liked' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleLike(product.id); }}
+                          title={liked.has(product.id) ? 'Unlike' : 'Like'}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill={liked.has(product.id) ? 'white' : 'none'} stroke={liked.has(product.id) ? 'white' : '#c8a96e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="vp-empty-block">More recent products and services will show here as inventory grows.</div>
+            )}
+          </>
         )}
       </main>
 
@@ -656,7 +884,7 @@ const PublicVendorPage: React.FC = () => {
         <div className="vp-shipping-strip">🚚 {settings.shipping_message}</div>
       )}
 
-      <section className="vp-social-section">
+      <section id="vp-social" className="vp-social-section">
         <div className="vp-social-inner">
           {/* Store Info */}
           <div>
@@ -739,6 +967,104 @@ const PublicVendorPage: React.FC = () => {
           © 2026 {brandName}. All rights reserved.
         </p>
       </footer>
+
+      {selectedProduct && (
+        <div className="vp-modal-overlay" onClick={closeProduct}>
+          <div className="vp-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="vp-modal-close" onClick={closeProduct}>✕</button>
+            <div className="vp-modal-body">
+              <div className="vp-modal-gallery">
+                <div className="vp-modal-main-img">
+                  {selectedProduct.images?.[modalImg] ? (
+                    <img src={selectedProduct.images[modalImg]} alt={selectedProduct.name} />
+                  ) : (
+                    <ProductPlaceholder name={selectedProduct.name} category={selectedProduct.category_name} size="lg" />
+                  )}
+                </div>
+                {selectedProduct.images?.length > 1 && (
+                  <div className="vp-modal-thumbs">
+                    {selectedProduct.images.map((img: string, i: number) => (
+                      <img
+                        key={i}
+                        src={img}
+                        alt=""
+                        className={`vp-modal-thumb${modalImg === i ? ' active' : ''}`}
+                        onClick={() => setModalImg(i)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="vp-modal-details">
+                <div className="vp-modal-cat">{selectedProduct.category_name}</div>
+                <div className="vp-modal-name">{selectedProduct.name}</div>
+                <div>
+                  <span className="vp-modal-price">
+                    ₹{Math.round(selectedProduct.discount_percentage > 0 ? selectedProduct.discounted_price : selectedProduct.price)}
+                  </span>
+                  {selectedProduct.discount_percentage > 0 && (
+                    <>
+                      <span className="vp-modal-price-old">₹{Math.round(selectedProduct.price)}</span>
+                      <span className="vp-modal-badge">{selectedProduct.discount_percentage}% off</span>
+                    </>
+                  )}
+                </div>
+                {settings?.show_ratings !== false && (
+                  <div className="vp-rating">
+                    <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(selectedProduct.rating || 5)))}</span>
+                    <span className="vp-rating-count">({selectedProduct.review_count || 24} reviews)</span>
+                  </div>
+                )}
+                <hr className="vp-modal-divider" />
+                <div className="vp-modal-desc">{selectedProduct.description || 'No description available.'}</div>
+                <div className="vp-modal-meta">
+                  {selectedProduct.stock != null && (
+                    <span className="vp-modal-tag">Stock: {selectedProduct.stock}</span>
+                  )}
+                  {selectedProduct.brand && (
+                    <span className="vp-modal-tag">Brand: {selectedProduct.brand}</span>
+                  )}
+                  {selectedProduct.unit && (
+                    <span className="vp-modal-tag">Unit: {selectedProduct.unit}</span>
+                  )}
+                </div>
+                {selectedProduct.variants?.length > 0 && (
+                  <>
+                    <hr className="vp-modal-divider" />
+                    <div>
+                      <div style={{ fontSize: 11, color: midColor, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Variants</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {selectedProduct.variants.map((v: any) => (
+                          <span key={v.id} className="vp-modal-tag">
+                            {[v.size, v.color].filter(Boolean).join(' / ')}
+                            {v.price ? ` — ₹${Math.round(v.price)}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+                <hr className="vp-modal-divider" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button
+                    className={`vp-like-btn${liked.has(selectedProduct.id) ? ' liked' : ''}`}
+                    style={{ width: 40, height: 40 }}
+                    onClick={() => toggleLike(selectedProduct.id)}
+                    title={liked.has(selectedProduct.id) ? 'Unlike' : 'Like'}
+                  >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill={liked.has(selectedProduct.id) ? 'white' : 'none'} stroke={liked.has(selectedProduct.id) ? 'white' : '#c8a96e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                  </button>
+                  <span style={{ fontSize: 12, color: midColor }}>
+                    {liked.has(selectedProduct.id) ? 'Saved to wishlist' : 'Save to wishlist'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
