@@ -27,7 +27,17 @@ const draftToFlat = (draft: any) => ({
   instagram_url: draft?.social?.instagram,
   twitter_url: draft?.social?.twitter,
   whatsapp_number: draft?.social?.whatsapp,
-  products_per_page: (draft?.layout?.productsPerRow || 4) * 2,
+  website_url: draft?.social?.website,
+  social_email: draft?.social?.email,
+  shipping_message: draft?.branding?.shippingMessage,
+  contact_hours: draft?.branding?.contactHours,
+  about_text: draft?.about?.text,
+  promo_headline: draft?.promo?.headline,
+  promo_subtext: draft?.promo?.subtext,
+  promo_cta_label: draft?.promo?.ctaLabel,
+  promo_cta_link: draft?.promo?.ctaLink,
+  products_per_page: (draft?.layout?.productsPerRow || 4) * 6,
+  products_per_row: draft?.layout?.productsPerRow || 4,
   meta_title: draft?.seo?.metaTitle,
   meta_description: draft?.seo?.metaDescription,
 });
@@ -268,16 +278,6 @@ const MarketplaceSettingsPage: React.FC = () => {
             {activeTab === 'branding' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="card-title">Branding & Theme</div>
-                <div className="form-group">
-                  <label className="form-label">Store Name</label>
-                  <input className="form-input" value={draft?.branding?.storeName || ''}
-                    onChange={(e) => setField(['branding', 'storeName'], e.target.value)} placeholder="Your Shop Name" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Tagline</label>
-                  <textarea className="form-textarea" rows={2} value={draft?.branding?.tagline || ''}
-                    onChange={(e) => setField(['branding', 'tagline'], e.target.value)} placeholder="Short description of your shop" />
-                </div>
                 <ColorField label="Accent Color" value={accent} onChange={(v) => setField(['theme', 'accentColor'], v)} />
                 <ColorField label="Header / Dark Color" value={dark} onChange={(v) => setField(['theme', 'primaryColor'], v)} />
                 <ColorField label="Background Color" value={bg} onChange={(v) => setField(['theme', 'backgroundColor'], v)} />

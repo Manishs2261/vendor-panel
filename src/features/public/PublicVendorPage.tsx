@@ -3,38 +3,69 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { publicApi } from '../../api/services';
 
 interface MarketplaceSettings {
-  theme?: string;
   primary_color?: string;
   secondary_color?: string;
   background_color?: string;
   banner_text?: string;
   banner_subtext?: string;
-  show_banner?: boolean;
-  show_vendor_info?: boolean;
-  show_contact_info?: boolean;
   show_ratings?: boolean;
   products_per_page?: number;
+  products_per_row?: number;
   custom_css?: string;
   facebook_url?: string;
   instagram_url?: string;
   twitter_url?: string;
   whatsapp_number?: string;
-  enable_reviews?: boolean;
-  enable_wishlist?: boolean;
-  enable_sharing?: boolean;
+  website_url?: string;
+  social_email?: string;
+  shipping_message?: string;
+  contact_hours?: string;
+  about_text?: string;
+  promo_headline?: string;
+  promo_subtext?: string;
+  promo_cta_label?: string;
+  promo_cta_link?: string;
   meta_title?: string;
   meta_description?: string;
-  meta_keywords?: string;
   banner_slides?: Array<{
     tag?: string;
     title?: string;
     subtext?: string;
     ctaLabel?: string;
+    ctaLink?: string;
     imageUrl?: string;
     bgColor?: string;
     sideImageUrl?: string;
   }>;
 }
+
+const storefrontToFlat = (s: any): MarketplaceSettings => ({
+  primary_color: s?.theme?.accentColor,
+  secondary_color: s?.theme?.primaryColor,
+  background_color: s?.theme?.backgroundColor,
+  banner_text: s?.banner?.slides?.[0]?.title || s?.branding?.storeName,
+  banner_subtext: s?.banner?.slides?.[0]?.subtext || s?.branding?.tagline,
+  show_ratings: true,
+  products_per_page: (s?.layout?.productsPerRow || 4) * 6,
+  products_per_row: s?.layout?.productsPerRow || 4,
+  custom_css: s?.branding?.customCss,
+  facebook_url: s?.social?.facebook,
+  instagram_url: s?.social?.instagram,
+  twitter_url: s?.social?.twitter,
+  whatsapp_number: s?.social?.whatsapp,
+  website_url: s?.social?.website,
+  social_email: s?.social?.email,
+  shipping_message: s?.branding?.shippingMessage,
+  contact_hours: s?.branding?.contactHours,
+  about_text: s?.about?.text,
+  promo_headline: s?.promo?.headline,
+  promo_subtext: s?.promo?.subtext,
+  promo_cta_label: s?.promo?.ctaLabel,
+  promo_cta_link: s?.promo?.ctaLink,
+  meta_title: s?.seo?.metaTitle,
+  meta_description: s?.seo?.metaDescription,
+  banner_slides: s?.banner?.slides || [],
+});
 
 interface PublicVendorData {
   vendor: {
@@ -130,10 +161,13 @@ const PublicVendorPage: React.FC = () => {
 
         try {
           const settingsResponse = await publicApi.getVendorMarketplaceSettings(vendorId);
-          setMarketplaceSettings(settingsResponse.data);
-        } catch (settingsError) {
-          console.error('Failed to load marketplace settings:', settingsError);
-          setMarketplaceSettings(null);
+          const payload = settingsResponse.data?.payload || settingsResponse.data;
+          setMarketplaceSettings(storefrontToFlat(payload));
+        } catch {
+          // fall back to storefront embedded in vendor profile
+          if (vendorResponse.data?.storefront) {
+            setMarketplaceSettings(storefrontToFlat(vendorResponse.data.storefront));
+          }
         }
 
         setError(null);
@@ -158,14 +192,19 @@ const PublicVendorPage: React.FC = () => {
   }, [previewSlideCount]);
 
   useEffect(() => {
-    // In non-preview mode slides are always 3; in preview mode use actual count
-    const count = previewSlideCount ?? 3;
+    const count = previewSlideCount ?? 2;
     if (count <= 1) return;
     const timer = window.setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % count);
     }, 4000);
     return () => window.clearInterval(timer);
   }, [previewSlideCount]);
+
+  const metaTitle = marketplaceSettings?.meta_title || previewSettings?.meta_title;
+  useEffect(() => {
+    if (metaTitle) document.title = metaTitle;
+    return () => { document.title = 'LocalShop'; };
+  }, [metaTitle]);
 
   if (loading) {
     return (
@@ -201,11 +240,13 @@ const PublicVendorPage: React.FC = () => {
   const brandName = shop?.name || vendor.business_name;
   const tagline = settings?.banner_subtext?.trim() || shop?.description || 'Thoughtfully crafted local products with premium quality and warm service.';
   const heroTitle = settings?.banner_text?.trim() || brandName;
+  const productsPerRow = settings?.products_per_row || 4;
   const activeProducts = products
-    .filter((product) => product.status === 'ACTIVE' || product.status === 'approved')
-    .slice(0, settings?.products_per_page || products.length || 8);
-  const featuredProducts = activeProducts.slice(0, 4);
-  const recentProducts = activeProducts.slice(4, 8).length > 0 ? activeProducts.slice(4, 8) : activeProducts.slice(0, 4);
+    .filter((product) => product.status === 'ACTIVE' || product.status === 'approved');
+  const featuredProducts = activeProducts.slice(0, productsPerRow);
+  const recentProducts = activeProducts.slice(productsPerRow, productsPerRow * 2).length > 0
+    ? activeProducts.slice(productsPerRow, productsPerRow * 2)
+    : activeProducts.slice(0, productsPerRow);
   const categories = Array.from(new Set(activeProducts.map((product) => product.category_name).filter(Boolean))).slice(0, 10);
   const addressText = [shop?.address, shop?.city, shop?.state, shop?.postal_code].filter(Boolean).join(', ');
   const supportLine = shop?.contact_email || vendor.business_email || 'support@localshop.in';
@@ -273,15 +314,6 @@ const PublicVendorPage: React.FC = () => {
           background: defaultSlideBackgrounds[1],
           visual: '',
         },
-        {
-          tag: 'Shop Highlights',
-          title: `${featuredProducts.length || activeProducts.length} curated products`,
-          copy: `Rated ${averageRating.toFixed(1)} by customers with ${overallReviews || 24} review mentions across this storefront.`,
-          button: 'Explore Products',
-          link: '',
-          background: defaultSlideBackgrounds[2],
-          visual: featuredProducts[0]?.images?.[0] || '',
-        },
       ];
 
   const slideCount = slides.length;
@@ -332,7 +364,7 @@ const PublicVendorPage: React.FC = () => {
         .vp-cat-card:hover{border-color:${accentColor};transform:translateY(-2px);box-shadow:0 6px 20px rgba(200,169,110,0.12)}
         .vp-cat-icon{font-size:28px;margin-bottom:10px;display:block}
         .vp-cat-name{font-size:12px;color:${midColor};font-weight:500}
-        .vp-product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:40px}
+        .vp-product-grid{display:grid;grid-template-columns:repeat(${productsPerRow},1fr);gap:18px;margin-bottom:40px}
         .vp-product-card{background:white;border-radius:14px;overflow:hidden;border:1px solid ${lightColor};transition:all 0.22s;cursor:pointer}
         .vp-product-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,0.08)}
         .vp-product-img{height:180px;display:flex;align-items:center;justify-content:center;background:${warmColor};position:relative}
@@ -357,6 +389,26 @@ const PublicVendorPage: React.FC = () => {
         .vp-stars{color:${accentColor};font-size:12px}
         .vp-rating-count{font-size:10px;color:${midColor}}
         .vp-empty-block{background:white;border:1px solid ${lightColor};border-radius:14px;padding:28px;color:${midColor};margin-bottom:40px}
+        .vp-about{background:white;border:1px solid ${lightColor};border-radius:14px;padding:28px 32px;margin-bottom:40px;display:flex;gap:20px;align-items:flex-start}
+        .vp-about-icon{font-size:32px;flex-shrink:0;margin-top:2px}
+        .vp-about-title{font-family:'Playfair Display',serif;font-size:17px;color:${darkColor};margin-bottom:8px}
+        .vp-about-text{font-size:13px;color:${midColor};line-height:1.7}
+        .vp-social-section{background:${darkColor};padding:48px 24px 36px}
+        .vp-social-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;align-items:start}
+        .vp-social-col-title{font-family:'Playfair Display',serif;font-size:15px;color:${accentColor};margin-bottom:14px;letter-spacing:0.04em}
+        .vp-social-info-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;font-size:12.5px;color:rgba(255,255,255,0.72);line-height:1.5}
+        .vp-social-info-row span:first-child{font-size:15px;opacity:0.7;flex-shrink:0;margin-top:1px}
+        .vp-social-links{display:flex;flex-wrap:wrap;gap:10px}
+        .vp-social-link{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;transition:background 0.2s}
+        .vp-social-link:hover{background:rgba(255,255,255,0.16)}
+        .vp-shipping-strip{background:${accentColor};color:white;text-align:center;padding:10px 24px;font-size:12.5px;font-weight:500;letter-spacing:0.04em}
+        .vp-wa-btn{display:inline-flex;align-items:center;gap:8px;background:#25d366;color:white;text-decoration:none;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:12px}
+        @media (max-width: 1100px){
+          .vp-social-inner{grid-template-columns:1fr 1fr}
+        }
+        @media (max-width: 760px){
+          .vp-social-inner{grid-template-columns:1fr}
+        }
         @media (max-width: 1100px){
           .vp-category-grid{grid-template-columns:repeat(3,1fr)}
           .vp-product-grid{grid-template-columns:repeat(2,1fr)}
@@ -470,6 +522,16 @@ const PublicVendorPage: React.FC = () => {
           ))}
         </div>
 
+        {settings?.about_text && (
+          <div className="vp-about">
+            <span className="vp-about-icon">🏪</span>
+            <div>
+              <div className="vp-about-title">About {brandName}</div>
+              <div className="vp-about-text">{settings.about_text}</div>
+            </div>
+          </div>
+        )}
+
         <div className="vp-section-header">
           <h2 className="vp-section-title">Featured Products</h2>
           <span className="vp-see-all">See All &rarr;</span>
@@ -516,16 +578,16 @@ const PublicVendorPage: React.FC = () => {
 
         <div className="vp-banner-strip">
           <div className="vp-banner-text">
-            <h3>{vendor.verified ? 'Verified Seller, Premium Experience' : 'Discover This Local Business'}</h3>
-            <p>{addressText || 'Trusted storefront with curated products and direct vendor contact.'}</p>
+            <h3>{settings?.promo_headline || (vendor.verified ? 'Verified Seller, Premium Experience' : 'Discover This Local Business')}</h3>
+            <p>{settings?.promo_subtext || addressText || 'Trusted storefront with curated products and direct vendor contact.'}</p>
           </div>
           <a
-            href={settings?.whatsapp_number ? `https://wa.me/${String(settings.whatsapp_number).replace(/\D/g, '')}` : `mailto:${supportLine}`}
+            href={settings?.promo_cta_link || (settings?.whatsapp_number ? `https://wa.me/${String(settings.whatsapp_number).replace(/\D/g, '')}` : `mailto:${supportLine}`)}
             className="vp-banner-cta"
             target="_blank"
             rel="noreferrer"
           >
-            Contact Vendor
+            {settings?.promo_cta_label || 'Contact Vendor'}
           </a>
         </div>
 
@@ -571,6 +633,86 @@ const PublicVendorPage: React.FC = () => {
           <div className="vp-empty-block">More recent products and services will show here as inventory grows.</div>
         )}
       </main>
+
+      {settings?.shipping_message && (
+        <div className="vp-shipping-strip">🚚 {settings.shipping_message}</div>
+      )}
+
+      <section className="vp-social-section">
+        <div className="vp-social-inner">
+          {/* Store Info */}
+          <div>
+            <div className="vp-social-col-title">{brandName}</div>
+            {addressText && (
+              <div className="vp-social-info-row"><span>📍</span><span>{addressText}</span></div>
+            )}
+            {(shop?.contact_phone || vendor.business_phone) && (
+              <div className="vp-social-info-row"><span>📞</span><span>{shop?.contact_phone || vendor.business_phone}</span></div>
+            )}
+            {(settings?.social_email || shop?.contact_email || vendor.business_email) && (
+              <div className="vp-social-info-row"><span>✉️</span><span>{settings?.social_email || shop?.contact_email || vendor.business_email}</span></div>
+            )}
+            {(settings?.contact_hours || businessHours) && (
+              <div className="vp-social-info-row"><span>🕐</span><span>{settings?.contact_hours || `${workingDays}: ${businessHours}`}</span></div>
+            )}
+          </div>
+
+          {/* Social Links */}
+          <div>
+            <div className="vp-social-col-title">Follow Us</div>
+            <div className="vp-social-links">
+              {settings?.whatsapp_number && (
+                <a href={`https://wa.me/${String(settings.whatsapp_number).replace(/\D/g, '')}`} className="vp-social-link" target="_blank" rel="noreferrer">
+                  💬 WhatsApp
+                </a>
+              )}
+              {settings?.instagram_url && (
+                <a href={settings.instagram_url} className="vp-social-link" target="_blank" rel="noreferrer">
+                  📸 Instagram
+                </a>
+              )}
+              {settings?.facebook_url && (
+                <a href={settings.facebook_url} className="vp-social-link" target="_blank" rel="noreferrer">
+                  📘 Facebook
+                </a>
+              )}
+              {settings?.twitter_url && (
+                <a href={settings.twitter_url} className="vp-social-link" target="_blank" rel="noreferrer">
+                  🐦 Twitter
+                </a>
+              )}
+              {settings?.website_url && (
+                <a href={settings.website_url} className="vp-social-link" target="_blank" rel="noreferrer">
+                  🌐 Website
+                </a>
+              )}
+              {!settings?.whatsapp_number && !settings?.instagram_url && !settings?.facebook_url && !settings?.twitter_url && !settings?.website_url && (
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>No social links added yet</span>
+              )}
+            </div>
+          </div>
+
+          {/* Contact CTA */}
+          <div>
+            <div className="vp-social-col-title">Get in Touch</div>
+            {settings?.whatsapp_number ? (
+              <a href={`https://wa.me/${String(settings.whatsapp_number).replace(/\D/g, '')}`} className="vp-wa-btn" target="_blank" rel="noreferrer">
+                💬 Chat on WhatsApp
+              </a>
+            ) : (
+              <a href={`mailto:${supportLine}`} className="vp-wa-btn" style={{ background: accentColor }} target="_blank" rel="noreferrer">
+                ✉️ Send Email
+              </a>
+            )}
+            {vendor.verified && (
+              <div className="vp-social-info-row" style={{ marginTop: 6 }}><span>✅</span><span>Verified Seller</span></div>
+            )}
+            {vendor.gst_number && (
+              <div className="vp-social-info-row"><span>🏷️</span><span>GST: {vendor.gst_number}</span></div>
+            )}
+          </div>
+        </div>
+      </section>
 
       <footer className="vp-footer">
         <div className="vp-footer-logo">{brandName}</div>
