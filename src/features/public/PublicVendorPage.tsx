@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { publicApi } from '../../api/services';
 
@@ -25,6 +25,15 @@ interface MarketplaceSettings {
   meta_title?: string;
   meta_description?: string;
   meta_keywords?: string;
+  banner_slides?: Array<{
+    tag?: string;
+    title?: string;
+    subtext?: string;
+    ctaLabel?: string;
+    imageUrl?: string;
+    bgColor?: string;
+    sideImageUrl?: string;
+  }>;
 }
 
 interface PublicVendorData {
@@ -80,20 +89,29 @@ const PublicVendorPage: React.FC = () => {
   const [marketplaceSettings, setMarketplaceSettings] = useState<MarketplaceSettings | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const previewSettings = useMemo(() => {
+  const [previewSettings, setPreviewSettings] = useState<MarketplaceSettings | null>(() => {
     const previewKey = new URLSearchParams(location.search).get('preview');
     if (!previewKey) return null;
-
     try {
-      const rawPreview = localStorage.getItem(previewKey);
-      if (!rawPreview) return null;
-      const parsedPreview = JSON.parse(rawPreview);
-      if (String(parsedPreview.vendorId) !== String(vendorId)) return null;
-      return parsedPreview.settings as MarketplaceSettings;
-    } catch (previewError) {
-      console.error('Failed to read preview settings:', previewError);
-      return null;
-    }
+      const raw = localStorage.getItem(previewKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (String(parsed.vendorId) !== String(vendorId)) return null;
+      return parsed.settings as MarketplaceSettings;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    const previewKey = new URLSearchParams(location.search).get('preview');
+    if (!previewKey) return;
+    const handler = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type === 'MP_PREVIEW_UPDATE' && String(e.data.vendorId) === String(vendorId)) {
+        setPreviewSettings(e.data.settings as MarketplaceSettings);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
   }, [location.search, vendorId]);
 
   useEffect(() => {
@@ -131,13 +149,23 @@ const PublicVendorPage: React.FC = () => {
     fetchVendorData();
   }, [vendorId]);
 
+  // Reset slide index when preview slide count changes so we don't land on a missing slide
+  const previewSlideCount = previewSettings?.banner_slides?.length;
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % 3);
-    }, 4000);
+    if (previewSlideCount !== undefined) {
+      setCurrentSlide((prev) => (prev >= previewSlideCount ? 0 : prev));
+    }
+  }, [previewSlideCount]);
 
+  useEffect(() => {
+    // In non-preview mode slides are always 3; in preview mode use actual count
+    const count = previewSlideCount ?? 3;
+    if (count <= 1) return;
+    const timer = window.setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % count);
+    }, 4000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [previewSlideCount]);
 
   if (loading) {
     return (
@@ -194,34 +222,69 @@ const PublicVendorPage: React.FC = () => {
     settings?.whatsapp_number,
   ].filter(Boolean);
 
-  const slides = [
-    {
-      tag: 'Featured Vendor',
-      title: heroTitle,
-      copy: tagline,
-      button: 'Visit Store',
-      background: shop?.banner_url
-        ? `linear-gradient(120deg, rgba(26,18,8,0.78) 55%, rgba(61,46,24,0.62) 100%), url(${shop.banner_url}) center/cover`
-        : `linear-gradient(120deg, ${darkColor} 55%, ${accentColor} 180%)`,
-      visual: shop?.logo_url,
-    },
-    {
-      tag: 'Trust & Service',
-      title: vendor.verified ? 'Verified Seller' : 'Local Business You Can Trust',
-      copy: addressText || 'Reliable quality, authentic service, and a storefront designed to make buying feel easy.',
-      button: 'See Contact Info',
-      background: 'linear-gradient(120deg, #0d2238 55%, #1a3d5c 100%)',
-      visual: '',
-    },
-    {
-      tag: 'Shop Highlights',
-      title: `${featuredProducts.length || activeProducts.length} curated products`,
-      copy: `Rated ${averageRating.toFixed(1)} by customers with ${overallReviews || 24} review mentions across this storefront.`,
-      button: 'Explore Products',
-      background: 'linear-gradient(120deg, #1a0d0d 55%, #3d1818 100%)',
-      visual: featuredProducts[0]?.images?.[0] || '',
-    },
+  const defaultSlideBackgrounds = [
+    shop?.banner_url
+      ? `linear-gradient(120deg, rgba(26,18,8,0.78) 55%, rgba(61,46,24,0.62) 100%), url(${shop.banner_url}) center/cover`
+      : `linear-gradient(120deg, ${darkColor} 55%, ${accentColor} 180%)`,
+    'linear-gradient(120deg, #0d2238 55%, #1a3d5c 100%)',
+    'linear-gradient(120deg, #1a0d0d 55%, #3d1818 100%)',
+    `linear-gradient(120deg, ${darkColor} 55%, #2d4a1a 100%)`,
+    'linear-gradient(120deg, #1a0d2e 55%, #3d1860 100%)',
+    'linear-gradient(120deg, #0d2a2a 55%, #1a5c5c 100%)',
   ];
+
+  const buildSlideBackground = (s: { imageUrl?: string; bgColor?: string }, fallback: string): string => {
+    if (s.imageUrl) {
+      return `linear-gradient(120deg, rgba(26,18,8,0.78) 55%, rgba(61,46,24,0.50) 100%), url(${s.imageUrl}) center/cover`;
+    }
+    if (s.bgColor) {
+      return `linear-gradient(135deg, ${s.bgColor} 0%, ${s.bgColor}99 100%)`;
+    }
+    return fallback;
+  };
+
+  const previewSlides = settings?.banner_slides;
+  const slides = previewSlides && previewSlides.length > 0
+    ? previewSlides.map((s, i) => ({
+        tag: s.tag || 'Featured',
+        title: s.title || heroTitle,
+        copy: s.subtext || tagline,
+        button: s.ctaLabel || 'Shop Now',
+        link: s.ctaLink || '',
+        background: buildSlideBackground(s, defaultSlideBackgrounds[i % defaultSlideBackgrounds.length]),
+        visual: s.sideImageUrl || (i === 0 ? shop?.logo_url : ''),
+      }))
+    : [
+        {
+          tag: 'Featured Vendor',
+          title: heroTitle,
+          copy: tagline,
+          button: 'Visit Store',
+          link: '',
+          background: defaultSlideBackgrounds[0],
+          visual: shop?.logo_url,
+        },
+        {
+          tag: 'Trust & Service',
+          title: vendor.verified ? 'Verified Seller' : 'Local Business You Can Trust',
+          copy: addressText || 'Reliable quality, authentic service, and a storefront designed to make buying feel easy.',
+          button: 'See Contact Info',
+          link: '',
+          background: defaultSlideBackgrounds[1],
+          visual: '',
+        },
+        {
+          tag: 'Shop Highlights',
+          title: `${featuredProducts.length || activeProducts.length} curated products`,
+          copy: `Rated ${averageRating.toFixed(1)} by customers with ${overallReviews || 24} review mentions across this storefront.`,
+          button: 'Explore Products',
+          link: '',
+          background: defaultSlideBackgrounds[2],
+          visual: featuredProducts[0]?.images?.[0] || '',
+        },
+      ];
+
+  const slideCount = slides.length;
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: creamColor, color: '#1a1a1a', fontFamily: "'DM Sans', sans-serif", fontSize: 14, overflowX: 'hidden' }}>
@@ -250,9 +313,9 @@ const PublicVendorPage: React.FC = () => {
         .vp-slide-title{font-family:'Playfair Display',serif;font-size:36px;color:white;line-height:1.15;margin-bottom:12px}
         .vp-slide-sub{font-size:13px;color:rgba(255,255,255,0.65);line-height:1.6;margin-bottom:24px}
         .vp-slide-btn{display:inline-flex;align-items:center;justify-content:center;background:${accentColor};color:white;text-decoration:none;border:none;padding:11px 28px;border-radius:4px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;letter-spacing:0.04em}
-        .vp-slide-visual{position:absolute;right:80px;top:50%;transform:translateY(-50%);width:220px;height:220px;border-radius:16px;overflow:hidden;opacity:0.92;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center}
-        .vp-slide-visual img{width:100%;height:100%;object-fit:cover}
-        .vp-slide-visual-fallback{width:220px;height:220px;display:flex;align-items:center;justify-content:center;color:${accentColor};font-family:'Playfair Display',serif;font-size:56px;border:1px solid rgba(255,255,255,0.12)}
+        .vp-slide-visual{position:absolute;right:72px;top:50%;transform:translateY(-50%);width:240px;height:240px;border-radius:50%;overflow:hidden;opacity:0.97;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(255,255,255,0.12),0 8px 40px rgba(0,0,0,0.40)}
+        .vp-slide-visual img{width:100%;height:100%;object-fit:cover;object-position:center top}
+        .vp-slide-visual-fallback{width:240px;height:240px;display:flex;align-items:center;justify-content:center;color:${accentColor};font-family:'Playfair Display',serif;font-size:72px;border:1px solid rgba(255,255,255,0.12)}
         .vp-carousel-dots{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10}
         .vp-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.35);cursor:pointer;transition:all 0.2s}
         .vp-dot.active{background:${accentColor};width:22px;border-radius:4px}
@@ -298,7 +361,7 @@ const PublicVendorPage: React.FC = () => {
           .vp-category-grid{grid-template-columns:repeat(3,1fr)}
           .vp-product-grid{grid-template-columns:repeat(2,1fr)}
           .vp-slide{padding:0 24px}
-          .vp-slide-visual{right:24px;width:180px;height:180px}
+          .vp-slide-visual{right:20px;width:180px;height:180px;border-radius:50%}
         }
         @media (max-width: 760px){
           .vp-topbar,.vp-header{padding-left:14px;padding-right:14px}
@@ -312,7 +375,7 @@ const PublicVendorPage: React.FC = () => {
           .vp-carousel{height:auto}
           .vp-slide{padding:28px 16px 70px;min-height:360px}
           .vp-slide-title{font-size:30px}
-          .vp-slide-visual{position:relative;right:auto;top:auto;transform:none;width:100%;max-width:220px;height:220px;margin-top:22px}
+          .vp-slide-visual{position:relative;right:auto;top:auto;transform:none;width:160px;height:160px;border-radius:50%;margin-top:22px}
         }
       `}</style>
 
@@ -353,7 +416,7 @@ const PublicVendorPage: React.FC = () => {
       </nav>
 
       <div className="vp-carousel">
-        <button className="vp-carousel-arrow vp-arrow-left" onClick={() => setCurrentSlide((prev) => (prev + 2) % 3)}>
+        <button className="vp-carousel-arrow vp-arrow-left" onClick={() => setCurrentSlide((prev) => (prev - 1 + slideCount) % slideCount)}>
           &#8592;
         </button>
         <div className="vp-slides" style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
@@ -363,9 +426,15 @@ const PublicVendorPage: React.FC = () => {
                 <div className="vp-slide-tag">{slide.tag}</div>
                 <div className="vp-slide-title">{slide.title}</div>
                 <div className="vp-slide-sub">{slide.copy}</div>
-                <Link to={`/vendor/${vendor.id}`} className="vp-slide-btn">
-                  {slide.button}
-                </Link>
+                {slide.link ? (
+                  <a href={slide.link} className="vp-slide-btn" target={slide.link.startsWith('http') ? '_blank' : '_self'} rel="noreferrer">
+                    {slide.button}
+                  </a>
+                ) : (
+                  <Link to={`/vendor/${vendor.id}`} className="vp-slide-btn">
+                    {slide.button}
+                  </Link>
+                )}
               </div>
               <div className="vp-slide-visual">
                 {slide.visual ? (
@@ -378,11 +447,11 @@ const PublicVendorPage: React.FC = () => {
           ))}
         </div>
         <div className="vp-carousel-dots">
-          {[0, 1, 2].map((index) => (
+          {slides.map((_, index) => (
             <div key={index} className={`vp-dot ${currentSlide === index ? 'active' : ''}`} onClick={() => setCurrentSlide(index)} />
           ))}
         </div>
-        <button className="vp-carousel-arrow vp-arrow-right" onClick={() => setCurrentSlide((prev) => (prev + 1) % 3)}>
+        <button className="vp-carousel-arrow vp-arrow-right" onClick={() => setCurrentSlide((prev) => (prev + 1) % slideCount)}>
           &#8594;
         </button>
       </div>

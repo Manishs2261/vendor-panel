@@ -262,6 +262,8 @@ export const analyticsApi = {
   getMarketplaceSettings: () => apiClient.get("/vendor/marketplace-settings"),
   updateMarketplaceSettings: (settings: any) =>
     apiClient.put("/vendor/marketplace-settings", settings),
+  publishMarketplaceSettings: () =>
+    apiClient.post("/vendor/marketplace-settings/publish"),
   resetMarketplaceSettings: () =>
     apiClient.post("/vendor/marketplace-settings/reset"),
 };

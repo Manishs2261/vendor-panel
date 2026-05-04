@@ -13,6 +13,8 @@ import ShopPage from './features/shop/ShopPage';
 import { PaymentsPage } from './features/payments/PaymentsPage';
 import NotificationsPage from './features/notifications/NotificationsPage';
 import SettingsPage from './features/settings/SettingsPage';
+import MarketplacePage from './features/marketplace/MarketplacePage';
+import MarketplaceSettingsPage from './features/marketplace/MarketplaceSettingsPage';
 import PublicVendorPage from './features/public/PublicVendorPage';
 import AnalyticsPage from './features/analytics/AnalyticsPage';
 import { useAppDispatch } from './hooks/redux';
@@ -49,6 +51,8 @@ const App: React.FC = () => (
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/marketplace" element={<MarketplacePage />} />
+              <Route path="/marketplace/settings" element={<MarketplaceSettingsPage />} />
             </Route>
           </Route>
 
