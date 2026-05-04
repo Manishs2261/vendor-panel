@@ -135,14 +135,32 @@ const PublicVendorPage: React.FC = () => {
   useEffect(() => {
     const previewKey = new URLSearchParams(location.search).get('preview');
     if (!previewKey) return;
-    const handler = (e: MessageEvent) => {
+
+    // postMessage from the Editor's direct preview iframe
+    const msgHandler = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type === 'MP_PREVIEW_UPDATE' && String(e.data.vendorId) === String(vendorId)) {
         setPreviewSettings(e.data.settings as MarketplaceSettings);
       }
     };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    window.addEventListener('message', msgHandler);
+
+    // BroadcastChannel picks up live draft changes from the Editor
+    // even when this page is loaded inside the Marketplace iframe (not the Editor preview iframe)
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('mp_preview');
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'MP_PREVIEW_UPDATE' && String(e.data.vendorId) === String(vendorId)) {
+          setPreviewSettings(e.data.settings as MarketplaceSettings);
+        }
+      };
+    } catch { /* BroadcastChannel not supported */ }
+
+    return () => {
+      window.removeEventListener('message', msgHandler);
+      bc?.close();
+    };
   }, [location.search, vendorId]);
 
   useEffect(() => {
@@ -335,8 +353,8 @@ const PublicVendorPage: React.FC = () => {
         .vp-icon-btn{width:36px;height:36px;border-radius:50%;background:${warmColor};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;color:${darkColor};font-size:14px}
         .vp-badge{position:absolute;top:-2px;right:-2px;background:${accentColor};color:white;border-radius:50%;width:16px;height:16px;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:500}
         .vp-nav{background:white;border-bottom:1px solid ${lightColor};padding:0 24px;display:flex;align-items:center;gap:0;overflow-x:auto}
-        .vp-nav-item{padding:12px 16px;font-size:13px;color:${midColor};cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all 0.2s;font-weight:400}
-        .vp-nav-item.active,.vp-nav-item:hover{color:${darkColor};border-bottom-color:${accentColor};font-weight:500}
+        .vp-nav-item{padding:12px 16px;font-size:13px;color:${midColor};cursor:pointer;white-space:nowrap;transition:color 0.2s;font-weight:400}
+        .vp-nav-item.active,.vp-nav-item:hover{color:${darkColor};font-weight:500}
         .vp-carousel{position:relative;overflow:hidden;height:340px;background:${darkColor}}
         .vp-slides{display:flex;transition:transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94);height:100%}
         .vp-slide{min-width:100%;height:100%;display:flex;align-items:center;padding:0 60px;position:relative;overflow:hidden}

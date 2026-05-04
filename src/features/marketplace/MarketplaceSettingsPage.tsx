@@ -140,15 +140,25 @@ const MarketplaceSettingsPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // Keep localStorage in sync and push live updates to preview iframe via postMessage
+  // Keep localStorage in sync and broadcast live updates to all preview iframes
+  // (Editor's own preview iframe via postMessage, Marketplace iframe via BroadcastChannel)
   useEffect(() => {
     if (!previewKey || !vendorId) return;
     const payload = { vendorId: String(vendorId), settings: draftToFlat(draft) };
     localStorage.setItem(previewKey, JSON.stringify(payload));
+
+    // Direct postMessage to the Editor's embedded preview iframe
     iframeRef.current?.contentWindow?.postMessage(
       { type: 'MP_PREVIEW_UPDATE', ...payload },
-      window.location.origin
+      window.location.origin,
     );
+
+    // BroadcastChannel so the Marketplace "My Storefront" iframe also gets live updates
+    try {
+      const bc = new BroadcastChannel('mp_preview');
+      bc.postMessage({ type: 'MP_PREVIEW_UPDATE', ...payload });
+      bc.close();
+    } catch { /* not supported */ }
   }, [draft, previewKey, vendorId]);
 
   const setField = (path: string[], value: any) =>
@@ -158,7 +168,10 @@ const MarketplaceSettingsPage: React.FC = () => {
     setSaving(true);
     try {
       const { data } = await analyticsApi.updateMarketplaceSettings(draft);
-      setEditorData(data.settings || data);
+      const saved = data.settings || data;
+      setEditorData(saved);
+      // Sync draft state from server so slidesCount and other normalised fields stay consistent
+      if (saved?.draft) setDraft(saved.draft);
       toast.success('Draft saved');
     } catch {
       toast.error('Failed to save draft');
@@ -170,9 +183,13 @@ const MarketplaceSettingsPage: React.FC = () => {
   const handlePublish = async () => {
     setPublishing(true);
     try {
+      // Always persist current editor state before publishing so the DB is up to date
+      await analyticsApi.updateMarketplaceSettings(draft);
       await analyticsApi.publishMarketplaceSettings();
       const { data } = await analyticsApi.getMarketplaceSettings();
       setEditorData(data);
+      // Sync draft state so returning to the editor shows exactly what was published
+      if (data?.draft) setDraft(data.draft);
       setPreviewVersion((v) => v + 1);
       toast.success('Storefront published!');
     } catch {
@@ -209,12 +226,13 @@ const MarketplaceSettingsPage: React.FC = () => {
     const slides = [...(draft?.banner?.slides || [{}])];
     if (slides.length >= 6) return;
     slides.push({ tag: '', title: '', subtext: '', ctaLabel: 'Shop Now', ctaLink: '#', imageUrl: '' });
-    setField(['banner', 'slides'], slides);
+    setDraft((d: any) => ({ ...d, banner: { ...(d?.banner || {}), slides, slidesCount: slides.length } }));
   };
 
   const removeSlide = (i: number) => {
     const slides = (draft?.banner?.slides || []).filter((_: any, idx: number) => idx !== i);
-    setField(['banner', 'slides'], slides.length > 0 ? slides : [{}]);
+    const next = slides.length > 0 ? slides : [{}];
+    setDraft((d: any) => ({ ...d, banner: { ...(d?.banner || {}), slides: next, slidesCount: next.length } }));
   };
 
   if (loading) {

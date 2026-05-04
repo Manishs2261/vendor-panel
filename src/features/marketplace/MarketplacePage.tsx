@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { analyticsApi } from '../../api/services';
-
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
 const MarketplacePage: React.FC = () => {
   const navigate = useNavigate();
   const [vendorId, setVendorId] = useState<string | null>(null);
-  const [view, setView] = useState<'all' | 'mine'>('all');
+  const [version, setVersion] = useState(0);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     analyticsApi.getMarketplaceSettings()
@@ -17,65 +16,79 @@ const MarketplacePage: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  const allUrl = `${BASE_URL}/marketplace`;
-  const myUrl = vendorId ? `/vendor/${vendorId}` : null;
+  // Re-push latest draft into the iframe via postMessage after it mounts
+  useEffect(() => {
+    if (!vendorId) return;
+    const previewKey = `mp-preview-${vendorId}`;
+    const raw = localStorage.getItem(previewKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      const id = window.setTimeout(() => {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'MP_PREVIEW_UPDATE', vendorId, settings: parsed.settings },
+          window.location.origin,
+        );
+      }, 600);
+      return () => window.clearTimeout(id);
+    } catch { /* ignore */ }
+  }, [vendorId, version]);
+
+  const myUrl = vendorId
+    ? `/vendor/${vendorId}?preview=mp-preview-${vendorId}`
+    : null;
+
+  const hasDraft = vendorId ? !!localStorage.getItem(`mp-preview-${vendorId}`) : false;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 12 }}>
-      {/* Header */}
       <div className="section-header">
         <div>
-          <div className="section-title">Marketplace</div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
-            Browse all vendors or view your own storefront
+          <div className="section-title">My Storefront</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>Live preview of your storefront</span>
+            {hasDraft && (
+              <span style={{ color: 'var(--yellow, #f59e0b)', fontWeight: 500 }}>
+                · Showing draft ·{' '}
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', color: 'var(--yellow, #f59e0b)', fontSize: 12.5, cursor: 'pointer', padding: 0, fontWeight: 500, textDecoration: 'underline' }}
+                  onClick={() => navigate('/marketplace/settings')}
+                >
+                  Publish changes
+                </button>
+              </span>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/marketplace/settings')}>
-            ⚙️ Customize My Store
-          </button>
-          <a
-            href={view === 'all' ? allUrl : (myUrl || allUrl)}
-            target="_blank"
-            rel="noreferrer"
+          <button
             className="btn btn-ghost btn-sm"
+            onClick={() => setVersion((v) => v + 1)}
+            title="Reload storefront preview"
           >
-            Open in new tab ↗
-          </a>
+            ↺ Refresh
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/marketplace/settings')}>
+            ⚙️ Storefront Editor
+          </button>
+          {vendorId && (
+            <a
+              href={`/vendor/${vendorId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-ghost btn-sm"
+            >
+              Open live ↗
+            </a>
+          )}
         </div>
       </div>
 
-      {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: 2, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 3, width: 'fit-content' }}>
-        <button
-          type="button"
-          className={`btn btn-sm ${view === 'all' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ border: 'none' }}
-          onClick={() => setView('all')}
-        >
-          🏬 All Vendors
-        </button>
-        <button
-          type="button"
-          className={`btn btn-sm ${view === 'mine' ? 'btn-primary' : 'btn-ghost'}`}
-          style={{ border: 'none' }}
-          onClick={() => setView('mine')}
-        >
-          🏪 My Storefront
-        </button>
-      </div>
-
-      {/* Iframe */}
-      {view === 'all' ? (
+      {myUrl ? (
         <iframe
-          key="all"
-          src={allUrl}
-          title="Marketplace"
-          style={{ flex: 1, width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', minHeight: 'calc(100vh - 200px)' }}
-        />
-      ) : myUrl ? (
-        <iframe
-          key="mine"
+          ref={iframeRef}
+          key={`storefront-${version}`}
           src={myUrl}
           title="My Storefront"
           style={{ flex: 1, width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius)', minHeight: 'calc(100vh - 200px)' }}

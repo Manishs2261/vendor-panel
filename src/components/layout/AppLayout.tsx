@@ -42,7 +42,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/payments': { title: 'Payments', sub: 'Payouts and commission history' },
   '/notifications': { title: 'Notifications', sub: 'Push notification history' },
   '/settings': { title: 'Settings', sub: 'Account access and session controls' },
-  '/marketplace': { title: 'Marketplace', sub: 'Your live storefront' },
+  '/marketplace': { title: 'My Storefront', sub: 'Preview and manage your live storefront' },
   '/marketplace/settings': { title: 'Storefront Editor', sub: 'Customize, preview and publish your store' },
   '/reviews': { title: 'Reviews', sub: 'Customer feedback across your product catalog' },
 };
