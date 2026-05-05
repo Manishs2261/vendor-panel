@@ -149,6 +149,29 @@ export interface ReviewStats {
   breakdown: Record<string, number>; // "1" → count, "2" → count, …
 }
 
+// ─── Help & Feedback ─────────────────────────────────────────────────────────
+export interface Feedback {
+  id: number;
+  vendor_id: number;
+  type: 'feedback' | 'bug_report' | 'feature_request' | 'general';
+  subject: string;
+  description: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high';
+  attachments?: string[];
+  admin_response?: string;
+  admin_response_at?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface FeedbackCreate {
+  type: Feedback['type'];
+  subject: string;
+  description: string;
+  priority: Feedback['priority'];
+}
+
 // ─── API ─────────────────────────────────────────────────────────────────────
 export interface PaginatedResponse<T> { items: T[]; total: number; page: number; pages: number; limit: number; }
 export interface AsyncState<T> { data: T | null; loading: boolean; error: string | null; }

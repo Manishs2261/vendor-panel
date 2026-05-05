@@ -19,6 +19,7 @@ import PublicVendorPage from './features/public/PublicVendorPage';
 import VendorAllProductsPage from './features/public/VendorAllProductsPage';
 import AnalyticsPage from './features/analytics/AnalyticsPage';
 import ReviewsPage from './features/reviews/ReviewsPage';
+import HelpFeedbackPage from './features/help/HelpFeedbackPage';
 import { useAppDispatch } from './hooks/redux';
 import './styles/global.css';
 
@@ -57,6 +58,7 @@ const App: React.FC = () => (
               <Route path="/marketplace" element={<MarketplacePage />} />
               <Route path="/marketplace/settings" element={<MarketplaceSettingsPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />
+              <Route path="/help" element={<HelpFeedbackPage />} />
             </Route>
           </Route>
 

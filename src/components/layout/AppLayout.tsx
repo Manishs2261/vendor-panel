@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Settings, LogOut } from 'lucide-react';
+import { Bell, Settings, LogOut, HelpCircle } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logout } from '../../features/auth/authSlice';
 import { fetchMyShop } from '../../features/shop/shopSlice';
@@ -19,6 +19,7 @@ const NAV = [
     group: 'Feedback',
     items: [
       { to: '/reviews', icon: 'R', label: 'Reviews' },
+      { to: '/help', icon: 'H', label: 'Help & Feedback' },
     ],
   },
   {
@@ -45,6 +46,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/marketplace': { title: 'My Storefront', sub: 'Preview and manage your live storefront' },
   '/marketplace/settings': { title: 'Storefront Editor', sub: 'Customize, preview and publish your store' },
   '/reviews': { title: 'Reviews', sub: 'Customer feedback across your product catalog' },
+  '/help': { title: 'Help & Feedback', sub: 'Report issues and share suggestions with our team' },
 };
 
 const AppLayout: React.FC = () => {
@@ -86,7 +88,11 @@ const AppLayout: React.FC = () => {
                   to={item.to}
                   className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                 >
-                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-icon">
+                    {item.to === '/help'
+                      ? <HelpCircle size={15} strokeWidth={1.8} />
+                      : item.icon}
+                  </span>
                   <span>{item.label}</span>
                   {item.badge === 'unread' && unreadCount > 0 && (
                     <span className="nav-badge">{unreadCount}</span>

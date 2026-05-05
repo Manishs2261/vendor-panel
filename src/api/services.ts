@@ -11,6 +11,8 @@ import type {
   Notification,
   Review,
   ReviewStats,
+  Feedback,
+  FeedbackCreate,
   PaginatedResponse,
   ShopForm,
   ProductForm,
@@ -326,6 +328,18 @@ export const reviewApi = {
 
   stats: () =>
     apiClient.get<ReviewStats>('/vendor/reviews/stats'),
+};
+
+// ─── Feedback API ─────────────────────────────────────────────────────────────
+export const feedbackApi = {
+  list: (params: { type?: string; status?: string; page?: number; limit?: number }) =>
+    apiClient.get<PaginatedResponse<Feedback>>('/vendor/help/feedback', { params }),
+
+  get: (id: number) =>
+    apiClient.get<Feedback>(`/vendor/help/feedback/${id}`),
+
+  submit: (data: FeedbackCreate) =>
+    apiClient.post<Feedback>('/vendor/help/feedback', data),
 };
 
 // â”€â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
