@@ -125,8 +125,13 @@ const LoginPage: React.FC = () => {
                 <label className="form-label">Password</label>
                 <input className="form-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
               </div>
-              <button className="auth-submit" type="submit" disabled={loading}>
-                {loading ? <span className="spinner" style={{ margin: '0 auto' }} /> : 'Sign In'}
+              <button className="auth-submit" type="submit" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {loading ? (
+                  <>
+                    <span className="spinner" />
+                    <span>Signing in…</span>
+                  </>
+                ) : 'Sign In'}
               </button>
             </form>
             <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-muted)' }}>
