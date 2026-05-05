@@ -16,6 +16,7 @@ import SettingsPage from './features/settings/SettingsPage';
 import MarketplacePage from './features/marketplace/MarketplacePage';
 import MarketplaceSettingsPage from './features/marketplace/MarketplaceSettingsPage';
 import PublicVendorPage from './features/public/PublicVendorPage';
+import VendorAllProductsPage from './features/public/VendorAllProductsPage';
 import AnalyticsPage from './features/analytics/AnalyticsPage';
 import ReviewsPage from './features/reviews/ReviewsPage';
 import { useAppDispatch } from './hooks/redux';
@@ -39,6 +40,7 @@ const App: React.FC = () => (
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/vendor/:vendorId" element={<PublicVendorPage />} />
+          <Route path="/vendor/:vendorId/products" element={<VendorAllProductsPage />} />
 
           {/* Protected */}
           <Route element={<ProtectedRoute />}>

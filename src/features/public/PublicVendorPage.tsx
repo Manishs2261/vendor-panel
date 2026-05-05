@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { publicApi } from '../../api/services';
 
 interface MarketplaceSettings {
@@ -142,6 +142,7 @@ interface PublicVendorData {
 const PublicVendorPage: React.FC = () => {
   const { vendorId } = useParams<{ vendorId: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const [data, setData] = useState<PublicVendorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -283,9 +284,150 @@ const PublicVendorPage: React.FC = () => {
   });
 
   if (loading) {
+    const Sk = ({ w, h, r = 6, style = {} }: { w: number | string; h: number; r?: number; style?: React.CSSProperties }) => (
+      <div style={{
+        width: w, height: h, borderRadius: r, flexShrink: 0,
+        background: 'linear-gradient(90deg,#ede8df 25%,#f5f1ea 50%,#ede8df 75%)',
+        backgroundSize: '600px 100%',
+        animation: 'skshimmer 1.4s infinite linear',
+        ...style,
+      }} />
+    );
+    const ProductCardSk = () => (
+      <div style={{ background: 'white', borderRadius: 14, overflow: 'hidden', border: '1px solid #ede8df' }}>
+        <Sk w="100%" h={180} r={0} />
+        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <Sk w={80} h={10} />
+          <Sk w="85%" h={14} />
+          <Sk w="60%" h={11} />
+          <Sk w="45%" h={11} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+            <Sk w={60} h={18} />
+            <Sk w={32} h={32} r={50} />
+          </div>
+        </div>
+      </div>
+    );
+
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: "'DM Sans', sans-serif", color: '#6b5c45' }}>
-        Loading storefront...
+      <div style={{ width: '100%', background: '#faf8f5', fontFamily: "'DM Sans', sans-serif", overflowX: 'hidden' }}>
+        <style>{`html,body,#root{background:#faf8f5}@keyframes skshimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}`}</style>
+
+        {/* topbar */}
+        <div style={{ background: '#1a1208', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Sk w={220} h={12} />
+          <Sk w={160} h={12} />
+        </div>
+
+        {/* header */}
+        <div style={{ background: 'white', borderBottom: '1px solid #ede8df', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Sk w={140} h={20} />
+            <Sk w={80} h={10} />
+          </div>
+          <Sk w={220} h={36} r={24} />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Sk w={36} h={36} r={50} />
+            <Sk w={36} h={36} r={50} />
+            <Sk w={36} h={36} r={50} />
+          </div>
+        </div>
+
+        {/* nav */}
+        <div style={{ background: 'white', borderBottom: '1px solid #ede8df', padding: '0 24px', display: 'flex', gap: 8, alignItems: 'center', height: 44 }}>
+          {[60, 90, 70, 80, 65, 75, 55, 68].map((w, i) => <Sk key={i} w={w} h={12} />)}
+        </div>
+
+        {/* hero banner */}
+        <Sk w="100%" h={340} r={0} />
+
+        {/* main */}
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px' }}>
+
+          {/* category header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Sk w={180} h={26} />
+            <Sk w={60} h={12} />
+          </div>
+          {/* category grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12, marginBottom: 40 }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} style={{ background: 'white', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, border: '1px solid #ede8df' }}>
+                <Sk w={56} h={56} r={10} />
+                <Sk w={60} h={11} />
+                <Sk w={44} h={10} />
+              </div>
+            ))}
+          </div>
+
+          {/* about block */}
+          <div style={{ background: 'white', border: '1px solid #ede8df', borderRadius: 14, padding: '28px 32px', marginBottom: 40, display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+            <Sk w={40} h={40} r={8} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Sk w={160} h={18} />
+              <Sk w="90%" h={13} />
+              <Sk w="70%" h={13} />
+              <div style={{ display: 'flex', gap: 24, marginTop: 6 }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Sk w={36} h={20} />
+                    <Sk w={52} h={10} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* featured header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Sk w={200} h={26} />
+            <Sk w={60} h={12} />
+          </div>
+          {/* featured products */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 18, marginBottom: 40 }}>
+            {Array.from({ length: 4 }).map((_, i) => <ProductCardSk key={i} />)}
+          </div>
+
+          {/* promo banner */}
+          <div style={{ background: '#1a1208', borderRadius: 14, padding: '28px 32px', marginBottom: 40, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Sk w={260} h={20} style={{ background: 'linear-gradient(90deg,#2d2318 25%,#3d3020 50%,#2d2318 75%)', backgroundSize: '600px 100%' }} />
+              <Sk w={180} h={12} style={{ background: 'linear-gradient(90deg,#2d2318 25%,#3d3020 50%,#2d2318 75%)', backgroundSize: '600px 100%' }} />
+            </div>
+            <Sk w={140} h={42} r={6} style={{ background: 'linear-gradient(90deg,#b8962a 25%,#c8a96e 50%,#b8962a 75%)', backgroundSize: '600px 100%' }} />
+          </div>
+
+          {/* recently added header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Sk w={190} h={26} />
+            <Sk w={60} h={12} />
+          </div>
+          {/* recently added products */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 18, marginBottom: 40 }}>
+            {Array.from({ length: 4 }).map((_, i) => <ProductCardSk key={i} />)}
+          </div>
+        </div>
+
+        {/* social footer */}
+        <div style={{ background: '#1a1208', padding: '48px 24px' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 40 }}>
+            {Array.from({ length: 3 }).map((_, col) => (
+              <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <Sk w={120} h={16} style={{ background: 'linear-gradient(90deg,#2d2318 25%,#3d3020 50%,#2d2318 75%)', backgroundSize: '600px 100%' }} />
+                {[140, 110, 160, 90].map((w, i) => (
+                  <Sk key={i} w={w} h={11} style={{ background: 'linear-gradient(90deg,#2d2318 25%,#3d3020 50%,#2d2318 75%)', backgroundSize: '600px 100%' }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* footer */}
+        <div style={{ background: '#120d06', padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <Sk w={120} h={18} style={{ background: 'linear-gradient(90deg,#1d1509 25%,#2d2010 50%,#1d1509 75%)', backgroundSize: '600px 100%' }} />
+          <Sk w={200} h={11} style={{ background: 'linear-gradient(90deg,#1d1509 25%,#2d2010 50%,#1d1509 75%)', backgroundSize: '600px 100%' }} />
+          <Sk w={160} h={10} style={{ background: 'linear-gradient(90deg,#1d1509 25%,#2d2010 50%,#1d1509 75%)', backgroundSize: '600px 100%' }} />
+        </div>
       </div>
     );
   }
@@ -411,6 +553,7 @@ const PublicVendorPage: React.FC = () => {
     <div style={{ width: '100%', minHeight: '100vh', background: creamColor, color: '#1a1a1a', fontFamily: "'DM Sans', sans-serif", fontSize: 14, overflowX: 'hidden' }}>
       {settings?.custom_css ? <style>{settings.custom_css}</style> : null}
       <style>{`
+        html,body,#root{background:${creamColor}}
         .vp-topbar{background:${darkColor};color:#e8d5b0;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:0.08em}
         .vp-topbar span{opacity:0.82}
         .vp-header{background:white;border-bottom:1px solid ${lightColor};padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
@@ -561,12 +704,21 @@ const PublicVendorPage: React.FC = () => {
           <span className="vp-logo-name">{brandName}</span>
           <span className="vp-logo-sub">Vendor Storefront</span>
         </div>
-        <div className="vp-search">
+        <div
+          className="vp-search"
+          onClick={() => navigate(`/vendor/${vendorId}/products?focus=1`)}
+          style={{ cursor: 'text' }}
+        >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b5c45" strokeWidth="2">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          <input type="text" placeholder="Search products..." />
+          <input
+            type="text"
+            placeholder="Search products..."
+            readOnly
+            style={{ cursor: 'text', pointerEvents: 'none' }}
+          />
         </div>
         <div className="vp-header-actions">
           <button className="vp-icon-btn">♡</button>
@@ -591,8 +743,8 @@ const PublicVendorPage: React.FC = () => {
           >{cat.name}</div>
         ))}
         <div
-          className={`vp-nav-item${viewAll && !activeCategory ? ' active' : ''}`}
-          onClick={() => { setViewAll(true); setActiveCategory(null); }}
+          className="vp-nav-item"
+          onClick={() => navigate(`/vendor/${vendorId}/products`)}
         >View All</div>
         {socialLinks.length > 0 && (
           <div className="vp-nav-item" onClick={() => scrollTo('vp-social')}>Social</div>
@@ -646,7 +798,7 @@ const PublicVendorPage: React.FC = () => {
           <>
             <div className="vp-section-header">
               <h2 className="vp-section-title">Shop by Category</h2>
-              <span className="vp-see-all">View All &rarr;</span>
+              <span className="vp-see-all" onClick={() => navigate(`/vendor/${vendorId}/products`)}>View All &rarr;</span>
             </div>
             <div className="vp-category-grid">
               {categories.map((cat) => (
@@ -770,7 +922,7 @@ const PublicVendorPage: React.FC = () => {
           <>
             <div className="vp-section-header">
               <h2 className="vp-section-title">Featured Products</h2>
-              <span className="vp-see-all" onClick={() => setViewAll(true)}>See All &rarr;</span>
+              <span className="vp-see-all" onClick={() => navigate(`/vendor/${vendorId}/products`)}>See All &rarr;</span>
             </div>
             {featuredProducts.length > 0 ? (
               <div className="vp-product-grid">
@@ -833,7 +985,7 @@ const PublicVendorPage: React.FC = () => {
 
             <div className="vp-section-header">
               <h2 className="vp-section-title">Recently Added</h2>
-              <span className="vp-see-all" onClick={() => setViewAll(true)}>See All &rarr;</span>
+              <span className="vp-see-all" onClick={() => navigate(`/vendor/${vendorId}/products`)}>See All &rarr;</span>
             </div>
             {recentProducts.length > 0 ? (
               <div className="vp-product-grid">
