@@ -4,6 +4,10 @@ import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGa
 import { vendorApi, shopApi, productApi, dashboardApi, type VendorProfileResponse } from '../../api/services';
 import type { ShopForm } from '../../types';
 import toast from 'react-hot-toast';
+import { GoogleMap, useJsApiLoader, Marker, Autocomplete } from '@react-google-maps/api';
+
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '';
+const DEFAULT_CENTER = { lat: 21.2514, lng: 81.6296 };
 
 const STATES = ['Chhattisgarh', 'Maharashtra', 'Madhya Pradesh', 'Uttar Pradesh', 'Delhi', 'Gujarat', 'Rajasthan', 'Karnataka', 'Tamil Nadu', 'West Bengal'];
 
@@ -50,6 +54,15 @@ const ShopPage: React.FC = () => {
   const bannerRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: ['places'] as any[]
+  });
+
+  const [map, setMap] = React.useState<google.maps.Map | null>(null);
+  const [autocomplete, setAutocomplete] = React.useState<google.maps.places.Autocomplete | null>(null);
 
   useEffect(() => {
     dispatch(fetchMyShop());
@@ -127,6 +140,45 @@ const ShopPage: React.FC = () => {
   const handleVerifyNow = () => {
     toast.success('Shop verification request submitted! We will review your documents shortly.');
     // In a real app, you would dispatch a thunk to update the shop status to 'PENDING_VERIFICATION'
+  };
+
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      set('latitude', e.latLng.lat());
+      set('longitude', e.latLng.lng());
+    }
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          set('latitude', position.coords.latitude);
+          set('longitude', position.coords.longitude);
+          map?.panTo({ lat: position.coords.latitude, lng: position.coords.longitude });
+          toast.success('Location updated to current position');
+        },
+        () => toast.error('Failed to get current location')
+      );
+    } else {
+      toast.error('Geolocation is not supported by your browser');
+    }
+  };
+
+  const onPlaceChanged = () => {
+    if (autocomplete !== null) {
+      const place = autocomplete.getPlace();
+      if (place.geometry && place.geometry.location) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+        set('latitude', lat);
+        set('longitude', lng);
+        map?.panTo({ lat, lng });
+        map?.setZoom(17);
+      }
+    } else {
+      console.log('Autocomplete is not loaded yet!');
+    }
   };
 
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -497,10 +549,82 @@ const ShopPage: React.FC = () => {
       {/* ── Location Tab ── */}
       {activeTab === 'location' && (
         <div className="card">
-          <div className="card-header"><div className="card-title">Google Map Location</div></div>
-          <div style={{ height: 300, background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)', marginBottom: 20, color: 'var(--text-muted)' }}>
-            🗺 Google Maps iframe — requires REACT_APP_GOOGLE_MAPS_API_KEY
+          <div className="card-header">
+            <div className="card-title">Google Map Location</div>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={handleUseCurrentLocation}>
+              📍 Use Current Location
+            </button>
           </div>
+          
+          <div style={{ height: 400, background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 20, position: 'relative' }}>
+            {isLoaded ? (
+              <>
+                <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', zIndex: 1, width: '90%', maxWidth: 400 }}>
+                  <Autocomplete
+                    onLoad={(a) => setAutocomplete(a)}
+                    onPlaceChanged={onPlaceChanged}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Search for your shop location..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 15px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border)',
+                        background: 'rgba(26, 26, 46, 0.9)',
+                        color: 'white',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                        outline: 'none'
+                      }}
+                    />
+                  </Autocomplete>
+                </div>
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  center={form.latitude && form.longitude ? { lat: form.latitude, lng: form.longitude } : DEFAULT_CENTER}
+                  zoom={15}
+                  onLoad={(m) => setMap(m)}
+                  onClick={handleMapClick}
+                  options={{
+                    styles: [
+                      { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
+                      { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a2e' }] },
+                      { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+                      { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+                      { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+                      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
+                      { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
+                      { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
+                      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
+                    ],
+                    disableDefaultUI: false,
+                    mapTypeControl: false,
+                    streetViewControl: false,
+                    fullscreenControl: false,
+                  }}
+                >
+                  {form.latitude && form.longitude && (
+                    <Marker 
+                      position={{ lat: form.latitude, lng: form.longitude }} 
+                      draggable={true}
+                      onDragEnd={(e) => {
+                        if (e.latLng) {
+                          set('latitude', e.latLng.lat());
+                          set('longitude', e.latLng.lng());
+                        }
+                      }}
+                    />
+                  )}
+                </GoogleMap>
+              </>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                {GOOGLE_MAPS_API_KEY ? 'Loading Maps...' : '⚠️ Please add REACT_APP_GOOGLE_MAPS_API_KEY to your .env file'}
+              </div>
+            )}
+          </div>
+
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Latitude <span style={{ color: 'var(--red)' }}>*</span></label>
@@ -511,7 +635,7 @@ const ShopPage: React.FC = () => {
               <input className="form-input" type="number" step="any" value={form.longitude || ''} onChange={(e) => set('longitude', +e.target.value)} placeholder="81.6296" />
             </div>
           </div>
-          <p className="form-hint" style={{ marginTop: 8 }}>📍 Precise location helps customers find your shop on the map and improves local search ranking</p>
+          <p className="form-hint" style={{ marginTop: 8 }}>📍 Click on the map or drag the marker to set your precise shop location.</p>
         </div>
       )}
     </form>
