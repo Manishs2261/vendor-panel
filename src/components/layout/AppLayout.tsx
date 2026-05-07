@@ -4,6 +4,7 @@ import { Bell, Settings, LogOut, HelpCircle } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logout } from '../../features/auth/authSlice';
 import { fetchMyShop } from '../../features/shop/shopSlice';
+import ThemeToggle from '../common/ThemeToggle';
 
 const NAV = [
   {
@@ -18,7 +19,8 @@ const NAV = [
   {
     group: 'Feedback',
     items: [
-      { to: '/reviews', icon: 'R', label: 'Reviews' },
+      { to: '/reviews/shop', icon: 'S', label: 'Shop Reviews' },
+      { to: '/reviews', icon: 'R', label: 'Product Reviews' },
       { to: '/help', icon: 'H', label: 'Help & Feedback' },
     ],
   },
@@ -45,7 +47,8 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/settings': { title: 'Settings', sub: 'Account access and session controls' },
   '/marketplace': { title: 'My Storefront', sub: 'Preview and manage your live storefront' },
   '/marketplace/settings': { title: 'Storefront Editor', sub: 'Customize, preview and publish your store' },
-  '/reviews': { title: 'Reviews', sub: 'Customer feedback across your product catalog' },
+  '/reviews': { title: 'Product Reviews', sub: 'Customer feedback across your product catalog' },
+  '/reviews/shop': { title: 'Shop Reviews', sub: 'General feedback about your shop and service' },
   '/help': { title: 'Help & Feedback', sub: 'Report issues and share suggestions with our team' },
 };
 
@@ -129,6 +132,7 @@ const AppLayout: React.FC = () => {
           </div>
 
           <div className="header-right">
+            <ThemeToggle />
             <button className="icon-btn" onClick={() => navigate('/notifications')} title="Notifications">
               <Bell size={17} strokeWidth={1.8} />
               {unreadCount > 0 && <span className="notif-dot" />}

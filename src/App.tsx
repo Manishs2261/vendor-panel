@@ -19,8 +19,10 @@ import PublicVendorPage from './features/public/PublicVendorPage';
 import VendorAllProductsPage from './features/public/VendorAllProductsPage';
 import AnalyticsPage from './features/analytics/AnalyticsPage';
 import ReviewsPage from './features/reviews/ReviewsPage';
+import ShopReviewsPage from './features/reviews/ShopReviewsPage';
 import HelpFeedbackPage from './features/help/HelpFeedbackPage';
 import { useAppDispatch } from './hooks/redux';
+import { ThemeProvider } from './context/ThemeContext';
 import './styles/global.css';
 
 // Init: fetch current vendor session on app load
@@ -35,8 +37,9 @@ const AppInit: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => (
   <Provider store={store}>
-    <BrowserRouter>
-      <AppInit>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AppInit>
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
@@ -58,6 +61,7 @@ const App: React.FC = () => (
               <Route path="/marketplace" element={<MarketplacePage />} />
               <Route path="/marketplace/settings" element={<MarketplaceSettingsPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />
+              <Route path="/reviews/shop" element={<ShopReviewsPage />} />
               <Route path="/help" element={<HelpFeedbackPage />} />
             </Route>
           </Route>
@@ -84,6 +88,7 @@ const App: React.FC = () => (
         />
       </AppInit>
     </BrowserRouter>
+    </ThemeProvider>
   </Provider>
 );
 

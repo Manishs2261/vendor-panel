@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { loginThunk, verifyEmailOtpThunk, setOtpStep } from './authSlice';
 import { authApi } from '../../api/services';
 import toast from 'react-hot-toast';
+import ThemeToggle from '../../components/common/ThemeToggle';
 
 type View = 'login' | 'register' | 'otp' | 'forgot';
 
@@ -112,6 +113,9 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="auth-page-wrapper">
+      <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 100 }}>
+        <ThemeToggle />
+      </div>
       {/* Animated Background Orbs */}
       <div className="orb orb-1"></div>
       <div className="orb orb-2"></div>
