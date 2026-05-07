@@ -5,7 +5,7 @@ import { loginThunk, verifyEmailOtpThunk, setOtpStep } from './authSlice';
 import { authApi } from '../../api/services';
 import toast from 'react-hot-toast';
 
-type View = 'login' | 'register' | 'otp';
+type View = 'login' | 'register' | 'otp' | 'forgot';
 
 const formatApiMessage = (value: any, fallback: string): string => {
   if (!value) return fallback;
@@ -96,22 +96,42 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <div className="auth-logo-mark">L</div>
-          <div className="auth-title">
-            {view === 'login' ? 'Welcome back' : view === 'register' ? 'Create account' : 'Verify email'}
-          </div>
-          <div className="auth-sub">
-            {view === 'login' ? 'Sign in to your vendor dashboard' :
-             view === 'register' ? 'Start selling on LocalShop' :
-             `Enter the 6-digit OTP sent to ${pendingEmail}`}
-          </div>
-        </div>
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalLoading(true);
+    try {
+      await authApi.forgotPassword(email);
+      toast.success('Reset link sent to your email!');
+      setView('login');
+    } catch (err: any) {
+      toast.error(getApiErrorMessage(err, 'Failed to send reset link'));
+    } finally {
+      setLocalLoading(false);
+    }
+  };
 
-        {error && <div className="auth-error">{error}</div>}
+  return (
+    <div className="auth-page-wrapper">
+      {/* Animated Background Orbs */}
+      <div className="orb orb-1"></div>
+      <div className="orb orb-2"></div>
+      <div className="orb orb-3"></div>
+
+      <div className="auth-page">
+        <div className="auth-card glass-panel">
+          <div className="auth-logo">
+            <div className="auth-logo-mark glow-effect">L</div>
+            <div className="auth-title">
+              {view === 'login' ? 'Welcome back' : view === 'register' ? 'Create account' : 'Verify email'}
+            </div>
+            <div className="auth-sub">
+              {view === 'login' ? 'Sign in to your vendor dashboard' :
+               view === 'register' ? 'Start selling on LocalShop' :
+               `Enter the 6-digit OTP sent to ${pendingEmail}`}
+            </div>
+          </div>
+
+          {error && <div className="auth-error glass-error">{error}</div>}
 
         {/* ── Login ── */}
         {view === 'login' && (
@@ -134,8 +154,29 @@ const LoginPage: React.FC = () => {
                 ) : 'Sign In'}
               </button>
             </form>
+            <div style={{ textAlign: 'center', marginTop: 14 }}>
+              <span className="auth-link" style={{ fontSize: 13 }} onClick={() => setView('forgot')}>Forgot password?</span>
+            </div>
             <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-muted)' }}>
               New vendor? <span className="auth-link" onClick={() => setView('register')}>Create account</span>
+            </p>
+          </>
+        )}
+
+        {/* ── Forgot Password ── */}
+        {view === 'forgot' && (
+          <>
+            <form onSubmit={handleForgotPassword}>
+              <div className="form-group" style={{ marginBottom: 20 }}>
+                <label className="form-label">Email address</label>
+                <input className="form-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+              </div>
+              <button className="auth-submit" type="submit" disabled={localLoading}>
+                {localLoading ? <span className="spinner" style={{ margin: '0 auto' }} /> : 'Send Reset Link'}
+              </button>
+            </form>
+            <p style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--text-muted)' }}>
+              Back to <span className="auth-link" onClick={() => setView('login')}>Sign in</span>
             </p>
           </>
         )}
@@ -199,6 +240,7 @@ const LoginPage: React.FC = () => {
             </p>
           </form>
         )}
+        </div>
       </div>
     </div>
   );
