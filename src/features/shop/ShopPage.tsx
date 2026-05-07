@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
-import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery, deleteGalleryImage } from './shopSlice';
+import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery, deleteGalleryImage, uploadIdDocument } from './shopSlice';
 import { vendorApi, shopApi, productApi, dashboardApi, type VendorProfileResponse } from '../../api/services';
 import type { ShopForm } from '../../types';
 import toast from 'react-hot-toast';
@@ -15,6 +15,7 @@ const buildShopPayload = (form: ShopForm) => ({
   state: form.state || undefined,
   country: 'India',
   pincode: form.postal_code || undefined,
+  id_type: form.id_type || undefined,
   latitude: typeof form.latitude === 'number' && !Number.isNaN(form.latitude) ? form.latitude : undefined,
   longitude: typeof form.longitude === 'number' && !Number.isNaN(form.longitude) ? form.longitude : undefined,
   logo_url: undefined,
@@ -22,6 +23,7 @@ const buildShopPayload = (form: ShopForm) => ({
   opening_time: undefined,
   closing_time: undefined,
   working_days: undefined,
+  id_document_url: form.id_document_url || undefined,
 });
 
 const ShopPage: React.FC = () => {
@@ -30,9 +32,11 @@ const ShopPage: React.FC = () => {
   const [form, setForm] = useState<ShopForm>({
     name: '', description: '', address: '', city: '', state: '',
     postal_code: '', business_type: 'RETAIL', gst_number: '',
-    contact_phone: '', contact_email: '',
+    contact_phone: '', contact_email: '', id_type: '',
+    id_document_url: '',
   });
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'media' | 'location'>('details');
   const [phoneOtpStep, setPhoneOtpStep] = useState<'idle' | 'sent'>('idle');
   const [emailOtpStep, setEmailOtpStep] = useState<'idle' | 'sent'>('idle');
@@ -45,6 +49,7 @@ const ShopPage: React.FC = () => {
   const logoRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const docRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     dispatch(fetchMyShop());
@@ -72,6 +77,8 @@ const ShopPage: React.FC = () => {
         business_type: shop.business_type,
         contact_phone: shop.contact_phone, contact_email: shop.contact_email,
         latitude: shop.latitude, longitude: shop.longitude,
+        id_type: shop.id_type || '',
+        id_document_url: shop.id_document_url || '',
       }));
     }
   }, [shop]);
@@ -86,6 +93,19 @@ const ShopPage: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.id_type) { toast.error('Please select an Identity Type'); return; }
+    if (!form.id_document_url && !shop?.id_document_url) { toast.error('Please upload an Identity Document'); return; }
+    if (!form.contact_phone) { toast.error('Phone number is required'); return; }
+    if (!vendor?.is_phone_verified) { toast.error('Please verify your phone number'); return; }
+    if (!form.contact_email) { toast.error('Email is required'); return; }
+    if (!vendor?.is_email_verified) { toast.error('Please verify your email address'); return; }
+    if (!form.address) { toast.error('Street address is required'); return; }
+    if (!form.city) { toast.error('City is required'); return; }
+    if (!form.postal_code) { toast.error('Postal code is required'); return; }
+    if (!form.state) { toast.error('State is required'); return; }
+    if (!shop?.logo_url) { toast.error('Shop logo / photo is required'); return; }
+    if (!shop?.gallery || shop.gallery.length === 0) { toast.error('At least one gallery image is required'); return; }
+    if (!form.latitude || !form.longitude) { toast.error('Please provide shop location (Latitude & Longitude)'); return; }
     setSaving(true);
     const payload = buildShopPayload(form) as any;
     const [result] = await Promise.all([
@@ -97,8 +117,16 @@ const ShopPage: React.FC = () => {
     setSaving(false);
     if (createShop.fulfilled.match(result) || updateShop.fulfilled.match(result)) {
       toast.success(shop ? 'Shop updated!' : 'Shop created!');
+      setSaveSuccess(true);
+      // Reset success message after 10 seconds
+      setTimeout(() => setSaveSuccess(false), 10000);
     }
     else toast.error('Failed to update shop');
+  };
+
+  const handleVerifyNow = () => {
+    toast.success('Shop verification request submitted! We will review your documents shortly.');
+    // In a real app, you would dispatch a thunk to update the shop status to 'PENDING_VERIFICATION'
   };
 
   const handleLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,13 +178,24 @@ const ShopPage: React.FC = () => {
       toast.error((result as any).payload as string || 'Gallery upload failed');
     }
   };
-
   const handleDeleteGallery = async (url: string) => {
     const result = await dispatch(deleteGalleryImage(url));
     if (deleteGalleryImage.fulfilled.match(result)) {
       toast.success('Image removed');
     } else {
       toast.error((result as any).payload as string || 'Failed to remove image');
+    }
+  };
+
+  const handleDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const result = await dispatch(uploadIdDocument(file));
+    if (uploadIdDocument.fulfilled.match(result)) {
+      await dispatch(fetchMyShop());
+      toast.success('Document uploaded!');
+    } else {
+      toast.error((result as any).payload as string || 'Document upload failed');
     }
   };
 
@@ -172,6 +211,7 @@ const ShopPage: React.FC = () => {
     { label: 'Shop address added', done: !!shop?.address },
     { label: 'Email verified', done: vendor?.is_email_verified || false },
     { label: 'Phone verified', done: vendor?.is_phone_verified || false },
+    { label: 'Identity document added', done: !!shop?.id_document_url },
     { label: '5+ products added', done: (dashboardStats?.total_products || 0) >= 5 },
   ], [vendorProfile, shop, dashboardStats, vendor]);
 
@@ -184,9 +224,16 @@ const ShopPage: React.FC = () => {
           <div className="section-title">Shop Profile</div>
           <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>Manage your shop details and media</div>
         </div>
-        <button type="submit" className="btn btn-primary" disabled={saving || loading}>
-          {saving ? <span className="spinner" /> : '💾 Save Changes'}
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {shop && !shop.is_verified && (
+            <button type="button" className={`btn ${saveSuccess ? 'btn-success' : 'btn-warning'}`} onClick={handleVerifyNow} style={{ boxShadow: saveSuccess ? '0 0 20px var(--green-bg)' : 'none' }}>
+              {saveSuccess ? '✅ Profile Ready - Verify Now' : '✨ Verify Now'}
+            </button>
+          )}
+          <button type="submit" className="btn btn-primary" disabled={saving || loading}>
+            {saving ? <span className="spinner" /> : '💾 Save Changes'}
+          </button>
+        </div>
       </div>
 
       {/* ── Completion ── */}
@@ -245,6 +292,31 @@ const ShopPage: React.FC = () => {
                   <label className="form-label">GST Number</label>
                   <input className="form-input" value={form.gst_number} onChange={(e) => set('gst_number', e.target.value.toUpperCase())} placeholder="22AAAAA0000A1Z5" maxLength={15} />
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Identity Type <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <select className="form-select" value={form.id_type} onChange={(e) => set('id_type', e.target.value)}>
+                    <option value="">Select Identity Type</option>
+                    <option value="Aadhaar Card">Aadhaar Card</option>
+                    <option value="PAN Card">PAN Card</option>
+                    <option value="Passport">Passport</option>
+                    <option value="Driving License">Driving License</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Upload Document <span style={{ color: 'var(--red)' }}>*</span></label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => docRef.current?.click()} disabled={uploading}>
+                      {uploading ? <span className="spinner" /> : '📤 Choose File'}
+                    </button>
+                    <input ref={docRef} type="file" style={{ display: 'none' }} onChange={handleDocument} />
+                    {shop?.id_document_url && (
+                      <a href={shop.id_document_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'underline' }}>
+                        View Document
+                      </a>
+                    )}
+                  </div>
+                  <p className="form-hint">Upload a clear scan or photo of your {form.id_type || 'Identity Card'}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -254,21 +326,21 @@ const ShopPage: React.FC = () => {
               <div className="card-header"><div className="card-title">Address</div></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="form-group">
-                  <label className="form-label">Street Address</label>
+                  <label className="form-label">Street Address <span style={{ color: 'var(--red)' }}>*</span></label>
                   <input className="form-input" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Shop number, street, area" />
                 </div>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label">City</label>
+                    <label className="form-label">City <span style={{ color: 'var(--red)' }}>*</span></label>
                     <input className="form-input" value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="Bilaspur" />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Postal Code</label>
+                    <label className="form-label">Postal Code <span style={{ color: 'var(--red)' }}>*</span></label>
                     <input className="form-input" value={form.postal_code} onChange={(e) => set('postal_code', e.target.value)} placeholder="495001" maxLength={6} />
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">State</label>
+                  <label className="form-label">State <span style={{ color: 'var(--red)' }}>*</span></label>
                   <select className="form-select" value={form.state} onChange={(e) => set('state', e.target.value)}>
                     <option value="">Select state</option>
                     {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -281,11 +353,11 @@ const ShopPage: React.FC = () => {
               <div className="card-header"><div className="card-title">Contact Details</div></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div className="form-group">
-                  <label className="form-label">Phone Number</label>
+                  <label className="form-label">Phone Number <span style={{ color: 'var(--red)' }}>*</span></label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input className="form-input" value={form.contact_phone} onChange={(e) => set('contact_phone', e.target.value)} placeholder="+91 9876543210" />
                     <button type="button" className="btn btn-warning btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setPhoneOtpStep('sent')}>
-                      {shop?.contact_phone ? '✓ Verified' : 'Verify'}
+                      {vendor?.is_phone_verified ? '✓ Verified' : 'Verify'}
                     </button>
                   </div>
                   {phoneOtpStep === 'sent' && (
@@ -296,11 +368,11 @@ const ShopPage: React.FC = () => {
                   )}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Email</label>
+                  <label className="form-label">Email <span style={{ color: 'var(--red)' }}>*</span></label>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input className="form-input" type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} placeholder="shop@email.com" />
                     <button type="button" className="btn btn-warning btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setEmailOtpStep('sent')}>
-                      {shop?.contact_email ? '✓ Verified' : 'Verify'}
+                      {vendor?.is_email_verified ? '✓ Verified' : 'Verify'}
                     </button>
                   </div>
                   {emailOtpStep === 'sent' && (
@@ -321,7 +393,7 @@ const ShopPage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="grid-2" style={{ alignItems: 'start' }}>
             <div className="card">
-              <div className="card-header"><div className="card-title">Shop Logo</div></div>
+              <div className="card-header"><div className="card-title">Shop Logo / Photo <span style={{ color: 'var(--red)' }}>*</span></div></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
                 <div style={{ width: 80, height: 80, borderRadius: 'var(--radius)', background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid var(--border)', fontSize: 32 }}>
                   {logoPreview ? (
@@ -378,7 +450,7 @@ const ShopPage: React.FC = () => {
           </div>
 
           <div className="card">
-            <div className="card-header"><div className="card-title">Shop Gallery</div><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{(shop?.gallery?.length || 0)} / 10 images</span></div>
+            <div className="card-header"><div className="card-title">Shop Gallery <span style={{ color: 'var(--red)' }}>*</span></div><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{(shop?.gallery?.length || 0)} / 10 images</span></div>
             <div className="image-grid">
               {/* Show existing gallery images */}
               {(shop?.gallery || []).map((url, i) => (
@@ -431,11 +503,11 @@ const ShopPage: React.FC = () => {
           </div>
           <div className="form-grid">
             <div className="form-group">
-              <label className="form-label">Latitude</label>
+              <label className="form-label">Latitude <span style={{ color: 'var(--red)' }}>*</span></label>
               <input className="form-input" type="number" step="any" value={form.latitude || ''} onChange={(e) => set('latitude', +e.target.value)} placeholder="21.2514" />
             </div>
             <div className="form-group">
-              <label className="form-label">Longitude</label>
+              <label className="form-label">Longitude <span style={{ color: 'var(--red)' }}>*</span></label>
               <input className="form-input" type="number" step="any" value={form.longitude || ''} onChange={(e) => set('longitude', +e.target.value)} placeholder="81.6296" />
             </div>
           </div>

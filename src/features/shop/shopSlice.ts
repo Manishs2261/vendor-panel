@@ -51,6 +51,11 @@ export const deleteGalleryImage = createAsyncThunk('shop/deleteGalleryImage', as
   catch (err: any) { return rejectWithValue(getUploadError(err, 'Failed to remove image')); }
 });
 
+export const uploadIdDocument = createAsyncThunk('shop/uploadIdDocument', async (file: File, { rejectWithValue }) => {
+  try { const { data } = await shopApi.uploadIdDocument(file); return data.url; }
+  catch (err: any) { return rejectWithValue(getUploadError(err, 'Document upload failed')); }
+});
+
 const shopSlice = createSlice({
   name: 'shop',
   initialState,
@@ -83,6 +88,10 @@ const shopSlice = createSlice({
       .addCase(uploadGallery.pending, (state) => { state.uploading = true; })
       .addCase(uploadGallery.fulfilled, (state, action) => { state.uploading = false; if (state.data) state.data.gallery = [...(state.data.gallery || []), ...action.payload]; })
       .addCase(uploadGallery.rejected, (state) => { state.uploading = false; })
+
+      .addCase(uploadIdDocument.pending, (state) => { state.uploading = true; })
+      .addCase(uploadIdDocument.fulfilled, (state, action) => { state.uploading = false; if (state.data) state.data.id_document_url = action.payload; })
+      .addCase(uploadIdDocument.rejected, (state) => { state.uploading = false; })
 
       .addCase(deleteGalleryImage.fulfilled, (state, action) => { if (state.data) state.data.gallery = (state.data.gallery || []).filter((u) => u !== action.payload); });
   },

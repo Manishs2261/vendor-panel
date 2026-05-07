@@ -31,6 +31,8 @@ export interface Shop {
   longitude?: number;
   contact_phone: string;
   contact_email: string;
+  id_type?: string;
+  id_document_url?: string;
   is_verified: boolean;
   completion_score: number;
   created_at: string;
@@ -188,5 +190,7 @@ export interface ShopForm {
   name: string; description: string; address: string; city: string;
   state: string; postal_code: string; business_type: 'RETAIL' | 'WHOLESALE' | 'BOTH';
   gst_number: string; contact_phone: string; contact_email: string;
+  id_type?: string;
+  id_document_url?: string;
   latitude?: number; longitude?: number;
 }

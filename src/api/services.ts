@@ -1,4 +1,4 @@
-﻿import { apiClient } from "./client";
+import { apiClient } from "./client";
 import axios from "axios";
 import type {
   Vendor,
@@ -151,6 +151,14 @@ export const shopApi = {
 
   removeGalleryImage: (url: string) =>
     apiClient.delete("/vendor/shop/gallery", { data: { url } }),
+
+  uploadIdDocument: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return apiClient.post<{ url: string }>("/vendor/shop/id-document", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 
   sendPhoneOtp: () => apiClient.post("/vendor/shop/verify-phone"),
   verifyPhoneOtp: (otp: string) =>
