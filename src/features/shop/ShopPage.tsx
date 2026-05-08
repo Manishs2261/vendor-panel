@@ -110,9 +110,9 @@ const ShopPage: React.FC = () => {
 
   const handleSendEmailOtp = async () => {
     try {
-      await authApi.sendEmailOtp();
+      await authApi.sendEmailOtp(form.contact_email);
       setEmailOtpStep('sent');
-      toast.success('OTP sent to your email');
+      toast.success(`OTP sent to ${form.contact_email}`);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to send OTP');
     }

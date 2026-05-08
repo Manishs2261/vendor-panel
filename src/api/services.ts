@@ -75,8 +75,8 @@ export const authApi = {
     password: string;
   }) => apiClient.post<AuthTokenResponse>("/auth/register/vendor", data),
 
-  sendEmailOtp: () =>
-    apiClient.post("/auth/verify/email/send"),
+  sendEmailOtp: (email?: string) =>
+    apiClient.post("/auth/verify/email/send", { email }),
 
   verifyEmailOtp: (otp: string) =>
     apiClient.post("/auth/verify/email/confirm", { otp }),
