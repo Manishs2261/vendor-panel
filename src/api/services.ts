@@ -87,6 +87,9 @@ export const authApi = {
   verifyPhoneOtp: (otp: string) =>
     apiClient.post("/auth/verify/phone/confirm", { otp }),
 
+  verifyPhoneWithFirebase: (firebaseToken: string) =>
+    apiClient.post("/auth/verify/phone/firebase", { firebase_token: firebaseToken }),
+
   forgotPassword: (email: string) =>
     apiClient.post("/auth/forgot-password", { email }),
 

@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { createShop, fetchMyShop, updateShop, uploadLogo, uploadBanner, uploadGallery, deleteGalleryImage, uploadIdDocument } from './shopSlice';
-import { vendorApi, shopApi, productApi, dashboardApi, type VendorProfileResponse } from '../../api/services';
+import { authApi, vendorApi, shopApi, productApi, dashboardApi, type VendorProfileResponse } from '../../api/services';
+import { auth as firebaseAuth } from '../../utils/firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
 import type { ShopForm } from '../../types';
 import toast from 'react-hot-toast';
 import { GoogleMap, useJsApiLoader, Marker, Autocomplete } from '@react-google-maps/api';
@@ -54,6 +56,8 @@ const ShopPage: React.FC = () => {
   const bannerRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const docRef = useRef<HTMLInputElement>(null);
+  const recaptchaRef = useRef<any>(null);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -103,6 +107,96 @@ const ShopPage: React.FC = () => {
   }, [vendorProfile]);
 
   const set = (key: keyof ShopForm, value: any) => setForm((f: ShopForm) => ({ ...f, [key]: value }));
+
+  const handleSendEmailOtp = async () => {
+    try {
+      await authApi.sendEmailOtp();
+      setEmailOtpStep('sent');
+      toast.success('OTP sent to your email');
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to send OTP');
+    }
+  };
+
+  const [emailOtp, setEmailOtp] = useState('');
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+
+  const handleVerifyEmailOtp = async () => {
+    if (!emailOtp) { toast.error('Please enter OTP'); return; }
+    setVerifyingEmail(true);
+    try {
+      await authApi.verifyEmailOtp(emailOtp);
+      toast.success('Email verified successfully!');
+      setEmailOtpStep('idle');
+      // Refresh shop and vendor info to reflect verified status
+      dispatch(fetchMyShop());
+      vendorApi.me().then(({ data }) => setVendorProfile(data));
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Invalid OTP');
+    } finally {
+      setVerifyingEmail(false);
+    }
+  };
+
+  const handleSendPhoneOtp = async () => {
+    if (!form.contact_phone) { toast.error('Please enter a phone number'); return; }
+    
+    // Ensure phone has country code for Firebase (+91 for India if not present)
+    let phone = form.contact_phone.trim();
+    if (!phone.startsWith('+')) {
+      phone = `+91${phone.replace(/^0+/, '')}`;
+    }
+
+    try {
+      // Setup Recaptcha
+      if (!recaptchaRef.current) {
+        recaptchaRef.current = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+          size: 'invisible',
+        });
+      }
+
+      const confirmation = await signInWithPhoneNumber(firebaseAuth, phone, recaptchaRef.current);
+      setConfirmationResult(confirmation);
+      setPhoneOtpStep('sent');
+      toast.success('OTP sent to your phone via Firebase');
+    } catch (err: any) {
+      console.error('Firebase SMS Error:', err);
+      toast.error(err.message || 'Failed to send OTP. Check console for details.');
+      // Reset recaptcha on error
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
+      }
+    }
+  };
+
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [verifyingPhone, setVerifyingPhone] = useState(false);
+
+  const handleVerifyPhoneOtp = async () => {
+    if (!phoneOtp) { toast.error('Please enter OTP'); return; }
+    if (!confirmationResult) { toast.error('Please request OTP first'); return; }
+    
+    setVerifyingPhone(true);
+    try {
+      // 1. Verify OTP with Firebase
+      const result = await confirmationResult.confirm(phoneOtp);
+      const idToken = await result.user.getIdToken();
+      
+      // 2. Send ID Token to our backend to mark phone as verified
+      await authApi.verifyPhoneWithFirebase(idToken);
+      
+      toast.success('Phone verified successfully!');
+      setPhoneOtpStep('idle');
+      setConfirmationResult(null);
+      dispatch(fetchMyShop());
+      vendorApi.me().then(({ data }) => setVendorProfile(data));
+    } catch (err: any) {
+      toast.error(err.message || 'Invalid OTP');
+    } finally {
+      setVerifyingPhone(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,7 +364,8 @@ const ShopPage: React.FC = () => {
   const score = Math.round((completionSteps.filter(step => step.done).length / completionSteps.length) * 100);
 
   return (
-    <form onSubmit={handleSave}>
+    <>
+      <form onSubmit={handleSave}>
       <div className="section-header">
         <div>
           <div className="section-title">Shop Profile</div>
@@ -407,30 +502,48 @@ const ShopPage: React.FC = () => {
                 <div className="form-group">
                   <label className="form-label">Phone Number <span style={{ color: 'var(--red)' }}>*</span></label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input className="form-input" value={form.contact_phone} onChange={(e) => set('contact_phone', e.target.value)} placeholder="+91 9876543210" />
-                    <button type="button" className="btn btn-warning btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setPhoneOtpStep('sent')}>
-                      {vendor?.is_phone_verified ? '✓ Verified' : 'Verify'}
-                    </button>
+                    <input className="form-input" value={form.contact_phone} onChange={(e) => set('contact_phone', e.target.value)} placeholder="+91 9876543210" disabled={vendor?.is_phone_verified} />
+                    {!vendor?.is_phone_verified && (
+                      <button type="button" className="btn btn-warning btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={handleSendPhoneOtp}>
+                        {phoneOtpStep === 'sent' ? 'Resend' : 'Verify'}
+                      </button>
+                    )}
+                    {vendor?.is_phone_verified && (
+                      <span style={{ color: 'var(--green)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                        <span style={{ fontSize: 16 }}>✓</span> Verified
+                      </span>
+                    )}
                   </div>
-                  {phoneOtpStep === 'sent' && (
+                  {phoneOtpStep === 'sent' && !vendor?.is_phone_verified && (
                     <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                      <input className="form-input" placeholder="Enter OTP" maxLength={6} />
-                      <button type="button" className="btn btn-success btn-sm">Confirm</button>
+                      <input className="form-input" placeholder="Enter OTP" maxLength={6} value={phoneOtp} onChange={(e) => setPhoneOtp(e.target.value)} />
+                      <button type="button" className="btn btn-success btn-sm" onClick={handleVerifyPhoneOtp} disabled={verifyingPhone}>
+                        {verifyingPhone ? <span className="spinner" /> : 'Confirm'}
+                      </button>
                     </div>
                   )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Email <span style={{ color: 'var(--red)' }}>*</span></label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input className="form-input" type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} placeholder="shop@email.com" />
-                    <button type="button" className="btn btn-warning btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setEmailOtpStep('sent')}>
-                      {vendor?.is_email_verified ? '✓ Verified' : 'Verify'}
-                    </button>
+                    <input className="form-input" type="email" value={form.contact_email} onChange={(e) => set('contact_email', e.target.value)} placeholder="shop@email.com" disabled={vendor?.is_email_verified} />
+                    {!vendor?.is_email_verified && (
+                      <button type="button" className="btn btn-warning btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={handleSendEmailOtp}>
+                        {emailOtpStep === 'sent' ? 'Resend' : 'Verify'}
+                      </button>
+                    )}
+                    {vendor?.is_email_verified && (
+                      <span style={{ color: 'var(--green)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                        <span style={{ fontSize: 16 }}>✓</span> Verified
+                      </span>
+                    )}
                   </div>
-                  {emailOtpStep === 'sent' && (
+                  {emailOtpStep === 'sent' && !vendor?.is_email_verified && (
                     <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                      <input className="form-input" placeholder="Enter OTP" maxLength={6} />
-                      <button type="button" className="btn btn-success btn-sm">Confirm</button>
+                      <input className="form-input" placeholder="Enter OTP" maxLength={6} value={emailOtp} onChange={(e) => setEmailOtp(e.target.value)} />
+                      <button type="button" className="btn btn-success btn-sm" onClick={handleVerifyEmailOtp} disabled={verifyingEmail}>
+                        {verifyingEmail ? <span className="spinner" /> : 'Confirm'}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -639,6 +752,8 @@ const ShopPage: React.FC = () => {
         </div>
       )}
     </form>
+    <div id="recaptcha-container"></div>
+    </>
   );
 };
 
