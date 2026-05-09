@@ -56,12 +56,12 @@ const ProductFormPage: React.FC = () => {
       productApi.get(id).then(({ data }) => {
         dispatch(setSelected(data));
         setForm({
-          name: data.name, description: data.description, price: data.price,
-          original_price: data.original_price || undefined,
-          discount_percentage: data.discount_percentage, unit: data.unit || '',
+          name: data.name, description: data.description, price: Number(data.price),
+          original_price: data.original_price != null ? Number(data.original_price) : undefined,
+          discount_percentage: Number(data.discount_percentage), unit: data.unit || '',
           category_id: data.category_id,
           subcategory_id: data.subcategory_id || '', brand: data.brand || '',
-          tags: Array.isArray(data.tags) ? data.tags : [], stock: data.stock,
+          tags: Array.isArray(data.tags) ? data.tags : [], stock: Number(data.stock),
           specifications: data.specifications || {},
           latitude: data.latitude, longitude: data.longitude,
           variations: data.variations || [], status: (String(data.status || 'ACTIVE').toUpperCase() as 'ACTIVE' | 'INACTIVE'),
