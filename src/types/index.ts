@@ -45,8 +45,10 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  original_price?: number;
   discount_percentage: number;
   discounted_price: number;
+  unit?: string;
   category_id: string;
   category_name: string;
   subcategory_id?: string;
@@ -55,9 +57,11 @@ export interface Product {
   tags: string[];
   sku: string;
   stock: number;
+  specifications?: Record<string, string>;
   images: string[];
   video?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'REJECTED';
+  is_featured: boolean;
   is_deleted: boolean;
   click_count: number;
   search_count: number;
@@ -180,9 +184,11 @@ export interface AsyncState<T> { data: T | null; loading: boolean; error: string
 export interface ListState<T> { items: T[]; total: number; page: number; pages: number; loading: boolean; error: string | null; }
 
 export interface ProductForm {
-  name: string; description: string; price: number; discount_percentage: number;
+  name: string; description: string; price: number; original_price?: number;
+  discount_percentage: number; unit?: string;
   category_id: string; subcategory_id?: string; brand: string; tags: string[];
-  sku?: string; stock: number; latitude?: number; longitude?: number;
+  sku?: string; stock: number; specifications?: Record<string, string>;
+  latitude?: number; longitude?: number;
   variations: ColorVariation[]; status: 'ACTIVE' | 'INACTIVE';
 }
 

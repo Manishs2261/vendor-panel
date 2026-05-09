@@ -16,10 +16,15 @@ type ImageEntry =
   | { kind: 'existing'; id: string; url: string }
   | { kind: 'new'; id: string; file: File; preview: string };
 
+type SpecEntry = { id: string; key: string; value: string };
+
+const UNITS = ['pcs', 'kg', 'g', 'litre', 'ml', 'meter', 'cm', 'dozen', 'pair', 'set', 'box', 'pack'];
+
 const defaultForm: ProductForm = {
-  name: '', description: '', price: 0, discount_percentage: 0,
+  name: '', description: '', price: 0, original_price: undefined,
+  discount_percentage: 0, unit: '',
   category_id: '', subcategory_id: '', brand: '', tags: [],
-  sku: '', stock: 0, variations: [], status: 'ACTIVE',
+  sku: '', stock: 0, specifications: {}, variations: [], status: 'ACTIVE',
 };
 
 const ProductFormPage: React.FC = () => {
@@ -34,6 +39,7 @@ const ProductFormPage: React.FC = () => {
   const [video, setVideo] = useState<File | null>(null);
   const [imageUploadErrors, setImageUploadErrors] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [specEntries, setSpecEntries] = useState<SpecEntry[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
@@ -51,12 +57,21 @@ const ProductFormPage: React.FC = () => {
         dispatch(setSelected(data));
         setForm({
           name: data.name, description: data.description, price: data.price,
-          discount_percentage: data.discount_percentage, category_id: data.category_id,
+          original_price: data.original_price || undefined,
+          discount_percentage: data.discount_percentage, unit: data.unit || '',
+          category_id: data.category_id,
           subcategory_id: data.subcategory_id || '', brand: data.brand || '',
           tags: Array.isArray(data.tags) ? data.tags : [], stock: data.stock,
+          specifications: data.specifications || {},
           latitude: data.latitude, longitude: data.longitude,
           variations: data.variations || [], status: (String(data.status || 'ACTIVE').toUpperCase() as 'ACTIVE' | 'INACTIVE'),
         });
+        const specs = data.specifications && typeof data.specifications === 'object'
+          ? Object.entries(data.specifications as Record<string, string>).map(([key, value]) => ({
+              id: `spec-${key}`, key, value,
+            }))
+          : [];
+        setSpecEntries(specs);
         setImageEntries((Array.isArray(data.images) ? data.images : []).map((url: string, i: number) => ({
           kind: 'existing' as const, id: `existing-${i}-${url.slice(-12)}`, url,
         })));
@@ -134,12 +149,15 @@ const ProductFormPage: React.FC = () => {
     setSubmitting(true);
     const existingImageUrls = imageEntries.filter((e) => e.kind === 'existing').map((e) => (e as { kind: 'existing'; id: string; url: string }).url);
     const newImageFiles = imageEntries.filter((e) => e.kind === 'new').map((e) => (e as { kind: 'new'; id: string; file: File; preview: string }).file);
+    const specsObj: Record<string, string> = {};
+    specEntries.forEach(({ key, value }) => { if (key.trim()) specsObj[key.trim()] = value.trim(); });
+    const finalForm = { ...form, specifications: specsObj };
     try {
       let result;
       if (isEdit && id) {
-        result = await dispatch(updateProduct({ id, form: { ...form, images: existingImageUrls } as any, newImages: newImageFiles, video: video || undefined }));
+        result = await dispatch(updateProduct({ id, form: { ...finalForm, images: existingImageUrls } as any, newImages: newImageFiles, video: video || undefined }));
       } else {
-        result = await dispatch(createProduct({ form, images: newImageFiles, video: video || undefined }));
+        result = await dispatch(createProduct({ form: finalForm, images: newImageFiles, video: video || undefined }));
       }
       if (createProduct.fulfilled.match(result) || updateProduct.fulfilled.match(result)) {
         toast.success(isEdit ? 'Product updated!' : 'Product created!');
@@ -158,6 +176,11 @@ const ProductFormPage: React.FC = () => {
   const parentCategories = (categories || []).filter((c) => !c.parent_id);
   const subCategories = (categories || []).filter((c) => c.parent_id === form.category_id);
   const discountedPrice = form.price * (1 - form.discount_percentage / 100);
+
+  const addSpec = () => setSpecEntries((prev) => [...prev, { id: `spec-${Date.now()}`, key: '', value: '' }]);
+  const removeSpec = (id: string) => setSpecEntries((prev) => prev.filter((s) => s.id !== id));
+  const updateSpec = (id: string, field: 'key' | 'value', val: string) =>
+    setSpecEntries((prev) => prev.map((s) => s.id === id ? { ...s, [field]: val } : s));
 
   return (
     <form onSubmit={handleSubmit}>
@@ -288,6 +311,40 @@ const ProductFormPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Specifications */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Specifications</div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={addSpec}>+ Add Row</button>
+            </div>
+            {specEntries.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                No specifications yet.{' '}
+                <span style={{ color: 'var(--primary)', cursor: 'pointer' }} onClick={addSpec}>Add one</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {specEntries.map((spec) => (
+                  <div key={spec.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+                    <input
+                      className="form-input"
+                      placeholder="Property (e.g. Material)"
+                      value={spec.key}
+                      onChange={(e) => updateSpec(spec.id, 'key', e.target.value)}
+                    />
+                    <input
+                      className="form-input"
+                      placeholder="Value (e.g. Cotton)"
+                      value={spec.value}
+                      onChange={(e) => updateSpec(spec.id, 'value', e.target.value)}
+                    />
+                    <button type="button" className="btn btn-danger btn-xs" onClick={() => removeSpec(spec.id)}>x</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Color Variations */}
           <div className="card">
             <div className="card-header"><div className="card-title">Color Variations</div><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>For clothing/accessories</span></div>
@@ -323,30 +380,60 @@ const ProductFormPage: React.FC = () => {
           <div className="card">
             <div className="card-header"><div className="card-title">Pricing & Stock</div></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Price (INR) <span>*</span></label>
-                <input className="form-input" type="number" min="0" value={form.price || ''} onChange={(e) => set('price', +e.target.value)} placeholder="0.00" required />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">MRP / Original Price (INR)</label>
+                  <input className="form-input" type="number" min="0" value={form.original_price || ''} onChange={(e) => set('original_price', e.target.value ? +e.target.value : undefined)} placeholder="e.g. 999" />
+                  <span className="form-hint">Crossed-out price shown to buyers</span>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Selling Price (INR) <span>*</span></label>
+                  <input className="form-input" type="number" min="0" value={form.price || ''} onChange={(e) => set('price', +e.target.value)} placeholder="0.00" required />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Discount (%)</label>
-                <input className="form-input" type="number" min="0" max="90" value={form.discount_percentage || ''} onChange={(e) => set('discount_percentage', +e.target.value)} placeholder="0" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Discount Badge (%)</label>
+                  <input className="form-input" type="number" min="0" max="90" value={form.discount_percentage || ''} onChange={(e) => set('discount_percentage', +e.target.value)} placeholder="0" />
+                  <span className="form-hint">% badge shown on product card</span>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Unit</label>
+                  <select className="form-select" value={form.unit || ''} onChange={(e) => set('unit', e.target.value)}>
+                    <option value="">Select unit</option>
+                    {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
               </div>
-              {form.discount_percentage > 0 && form.price > 0 && (
+              {(form.original_price || form.discount_percentage > 0) && form.price > 0 && (
                 <div style={{ background: 'var(--green-bg)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', fontSize: 13 }}>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>Final price after discount</div>
-                  <div style={{ color: 'var(--green)', fontFamily: 'var(--display)', fontSize: 22, fontWeight: 700 }}>INR {discountedPrice.toFixed(0)}</div>
+                  {form.original_price && form.original_price > form.price && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>
+                      MRP <span style={{ textDecoration: 'line-through' }}>INR {form.original_price}</span>
+                    </div>
+                  )}
+                  <div style={{ color: 'var(--green)', fontFamily: 'var(--display)', fontSize: 22, fontWeight: 700 }}>
+                    INR {form.price.toFixed(0)}
+                    {form.discount_percentage > 0 && (
+                      <span style={{ fontSize: 13, marginLeft: 8, background: '#ef4444', color: '#fff', borderRadius: 4, padding: '2px 6px' }}>
+                        {form.discount_percentage}% OFF
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
-              <div className="form-group">
-                <label className="form-label">Stock Quantity</label>
-                <input className="form-input" type="number" min="0" value={form.stock || ''} onChange={(e) => set('stock', +e.target.value)} placeholder="0" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select className="form-select" value={form.status} onChange={(e) => set('status', e.target.value as 'ACTIVE' | 'INACTIVE')}>
-                  <option value="ACTIVE">Active - visible in search</option>
-                  <option value="INACTIVE">Inactive - hidden</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Stock Quantity</label>
+                  <input className="form-input" type="number" min="0" value={form.stock || ''} onChange={(e) => set('stock', +e.target.value)} placeholder="0" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <select className="form-select" value={form.status} onChange={(e) => set('status', e.target.value as 'ACTIVE' | 'INACTIVE')}>
+                    <option value="ACTIVE">Active - visible in search</option>
+                    <option value="INACTIVE">Inactive - hidden</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
