@@ -58,6 +58,7 @@ const VendorAllProductsPage: React.FC = () => {
   const [error, setError]           = useState<string | null>(null);
 
   const [search, setSearch]         = useState(searchParams.get('q') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [activeCat, setActiveCat]   = useState<string | null>(searchParams.get('category'));
   const [sort, setSort]             = useState('newest');
   const [shown, setShown]           = useState(PAGE);
@@ -75,7 +76,13 @@ const VendorAllProductsPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [vendorId]);
 
-  useEffect(() => { setShown(PAGE); }, [search, activeCat, sort]);
+  // Debounce search — wait 300 ms after the user stops typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => { setShown(PAGE); }, [debouncedSearch, activeCat, sort]);
 
   // auto-focus search when redirected from home page (?focus=1)
   const shouldFocus = searchParams.get('focus') === '1';
@@ -97,7 +104,9 @@ const VendorAllProductsPage: React.FC = () => {
   const closeModal = () => setModal(null);
 
   const allActive: Product[] = useMemo(() =>
-    (vendorData?.products || []).filter((p: Product) => p.status?.toLowerCase() === 'active'),
+    (vendorData?.products || []).filter((p: Product) =>
+      ['active', 'approved'].includes(p.status?.toLowerCase() ?? '')
+    ),
     [vendorData]
   );
 
@@ -105,9 +114,9 @@ const VendorAllProductsPage: React.FC = () => {
 
   const filtered: Product[] = useMemo(() => {
     let list = activeCat ? allActive.filter(p => p.category_name === activeCat) : allActive;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(p => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q) || p.category_name?.toLowerCase().includes(q));
     }
     if (sort === 'price_asc')  return [...list].sort((a, b) => (a.discount_percentage > 0 ? a.discounted_price : a.price) - (b.discount_percentage > 0 ? b.discounted_price : b.price));
     if (sort === 'price_desc') return [...list].sort((a, b) => (b.discount_percentage > 0 ? b.discounted_price : b.price) - (a.discount_percentage > 0 ? a.discounted_price : a.price));

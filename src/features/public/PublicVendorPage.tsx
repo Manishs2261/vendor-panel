@@ -153,8 +153,12 @@ const PublicVendorPage: React.FC = () => {
   const [modalImg, setModalImg] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [viewAll, setViewAll] = useState(false);
-  const [displayCount, setDisplayCount] = useState(12);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PRODUCTS_PER_PAGE = 8;
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const toggleLike = (id: string) =>
     setLiked((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -165,8 +169,14 @@ const PublicVendorPage: React.FC = () => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Reset pagination when switching views
-  useEffect(() => { setDisplayCount(12); }, [activeCategory, viewAll]);
+  // Reset page when category, view or search changes
+  useEffect(() => { setCurrentPage(1); }, [activeCategory, viewAll, debouncedSearch]);
+
+  // Debounce search — 300 ms after user stops typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const [previewSettings, setPreviewSettings] = useState<MarketplaceSettings | null>(() => {
     const previewKey = new URLSearchParams(location.search).get('preview');
@@ -461,10 +471,16 @@ const PublicVendorPage: React.FC = () => {
   const productsPerRow = settings?.products_per_row || 4;
   const activeProducts = products
     .filter((product) => ['active', 'approved'].includes(product.status?.toLowerCase() ?? ''));
-  const filteredProducts = activeCategory
-    ? activeProducts.filter((p) => p.category_name === activeCategory)
-    : activeProducts;
-  const isPaginatedView = viewAll || !!activeCategory;
+  const filteredProducts = activeProducts
+    .filter(p => !activeCategory || p.category_name === activeCategory)
+    .filter(p => {
+      if (!debouncedSearch.trim()) return true;
+      const q = debouncedSearch.toLowerCase();
+      return p.name.toLowerCase().includes(q)
+        || p.description?.toLowerCase().includes(q)
+        || p.category_name?.toLowerCase().includes(q);
+    });
+  const isPaginatedView = viewAll || !!activeCategory || !!debouncedSearch.trim();
   // Normal home view slices (used only when !isPaginatedView)
   const featuredProducts = activeProducts.slice(0, productsPerRow);
   const recentProducts = activeProducts.slice(productsPerRow, productsPerRow * 2).length > 0
@@ -594,6 +610,7 @@ const PublicVendorPage: React.FC = () => {
         .vp-category-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:40px}
         .vp-cat-card{background:white;border-radius:12px;padding:14px 10px;text-align:center;border:1px solid ${lightColor};transition:all 0.2s;display:flex;flex-direction:column;align-items:center;gap:8px}
         .vp-cat-card:hover{border-color:${accentColor};transform:translateY(-2px);box-shadow:0 6px 20px rgba(200,169,110,0.12)}
+        .vp-cat-card--active{border-color:${accentColor};background:${accentColor}12;box-shadow:0 6px 20px rgba(200,169,110,0.18)}
         .vp-cat-thumb{width:56px;height:56px;border-radius:10px;object-fit:cover;background:${warmColor};flex-shrink:0}
         .vp-cat-thumb-placeholder{width:56px;height:56px;border-radius:10px;background:${warmColor};display:flex;align-items:center;justify-content:center;font-size:22px}
         .vp-cat-name{font-size:12px;color:${darkColor};font-weight:600;line-height:1.3}
@@ -704,21 +721,26 @@ const PublicVendorPage: React.FC = () => {
           <span className="vp-logo-name">{brandName}</span>
           <span className="vp-logo-sub">Vendor Storefront</span>
         </div>
-        <div
-          className="vp-search"
-          onClick={() => navigate(`/vendor/${vendorId}/products?focus=1`)}
-          style={{ cursor: 'text' }}
-        >
+        <div className="vp-search">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b5c45" strokeWidth="2">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
+            ref={searchRef}
             type="text"
             placeholder="Search products..."
-            readOnly
-            style={{ cursor: 'text', pointerEvents: 'none' }}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
           />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); searchRef.current?.focus(); }}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#6b5c45', fontSize: 15, padding: 0, lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          )}
         </div>
         <div className="vp-header-actions">
           <button className="vp-icon-btn">♡</button>
@@ -802,7 +824,15 @@ const PublicVendorPage: React.FC = () => {
             </div>
             <div className="vp-category-grid">
               {categories.map((cat) => (
-                <div key={cat.name} className="vp-cat-card">
+                <div
+                  key={cat.name}
+                  className={`vp-cat-card${activeCategory === cat.name ? ' vp-cat-card--active' : ''}`}
+                  onClick={() => {
+                    setActiveCategory(cat.name);
+                    setTimeout(() => scrollTo('vp-products-section'), 50);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   {cat.image
                     ? <img src={cat.image} alt={cat.name} className="vp-cat-thumb" />
                     : <div className="vp-cat-thumb-placeholder">🛍</div>}
@@ -850,73 +880,154 @@ const PublicVendorPage: React.FC = () => {
 
         {isPaginatedView ? (
           /* ── Paginated "View All / Category" view ── */
-          <>
-            <div className="vp-section-header">
-              <h2 className="vp-section-title">
-                {activeCategory || 'All Products'}
-                <span style={{ fontSize: 13, color: '#6b5c45', fontWeight: 400, marginLeft: 10 }}>
-                  ({filteredProducts.length})
-                </span>
-              </h2>
-              <span
-                className="vp-see-all"
-                onClick={() => { setViewAll(false); setActiveCategory(null); }}
-              >← Back</span>
-            </div>
-            {filteredProducts.length > 0 ? (
+          (() => {
+            const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+            const pageProducts = filteredProducts.slice(
+              (currentPage - 1) * PRODUCTS_PER_PAGE,
+              currentPage * PRODUCTS_PER_PAGE
+            );
+
+            const goToPage = (p: number) => {
+              setCurrentPage(p);
+              scrollTo('vp-products-section');
+            };
+
+            // Build page number array with ellipsis: [1, '...', 4, 5, 6, '...', 10]
+            const pageNums: (number | '...')[] = [];
+            if (totalPages <= 7) {
+              for (let i = 1; i <= totalPages; i++) pageNums.push(i);
+            } else {
+              pageNums.push(1);
+              if (currentPage > 3) pageNums.push('...');
+              for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) pageNums.push(i);
+              if (currentPage < totalPages - 2) pageNums.push('...');
+              pageNums.push(totalPages);
+            }
+
+            return (
               <>
-                <div className="vp-product-grid">
-                  {filteredProducts.slice(0, displayCount).map((product) => (
-                    <article key={product.id} className="vp-product-card" onClick={() => openProduct(product)}>
-                      <div className="vp-product-img">
-                        {product.discount_percentage > 0 && <div className="vp-product-badge">Sale</div>}
-                        {product.images[0]
-                          ? <img src={product.images[0]} alt={product.name} />
-                          : <ProductPlaceholder name={product.name} category={product.category_name} />}
-                      </div>
-                      <div className="vp-product-info">
-                        {settings?.show_ratings !== false && (
-                          <div className="vp-rating">
-                            <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 5)))}</span>
-                            <span className="vp-rating-count">({product.review_count || 24})</span>
-                          </div>
-                        )}
-                        <div className="vp-product-name">{product.name}</div>
-                        <div className="vp-product-desc">{product.description || `${product.category_name || 'Store'} product from ${brandName}`}</div>
-                        <div className="vp-product-footer">
-                          <div>
-                            <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
-                            {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
-                          </div>
-                          <button
-                            className={`vp-like-btn${liked.has(product.id) ? ' liked' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); toggleLike(product.id); }}
-                            title={liked.has(product.id) ? 'Unlike' : 'Like'}
-                          >
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill={liked.has(product.id) ? 'white' : 'none'} stroke={liked.has(product.id) ? 'white' : '#c8a96e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
+                <div id="vp-products-section" className="vp-section-header" style={{ scrollMarginTop: 120 }}>
+                  <h2 className="vp-section-title">
+                    {debouncedSearch.trim()
+                      ? `Results for "${debouncedSearch}"`
+                      : activeCategory || 'All Products'}
+                    <span style={{ fontSize: 13, color: '#6b5c45', fontWeight: 400, marginLeft: 10 }}>
+                      ({filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''})
+                    </span>
+                  </h2>
+                  <span
+                    className="vp-see-all"
+                    onClick={() => { setViewAll(false); setActiveCategory(null); setSearchQuery(''); }}
+                  >← Back</span>
                 </div>
-                {displayCount < filteredProducts.length ? (
-                  <div ref={sentinelRef} style={{ textAlign: 'center', padding: '28px 0', color: '#6b5c45', fontSize: 12 }}>
-                    <span style={{ display: 'inline-block', width: 20, height: 20, border: '2px solid #c8a96e', borderTopColor: 'transparent', borderRadius: '50%', animation: 'vpSpin 0.7s linear infinite', verticalAlign: 'middle', marginRight: 8 }} />
-                    Loading more products…
-                  </div>
+
+                {filteredProducts.length > 0 ? (
+                  <>
+                    <div className="vp-product-grid">
+                      {pageProducts.map((product) => (
+                        <article key={product.id} className="vp-product-card" onClick={() => openProduct(product)}>
+                          <div className="vp-product-img">
+                            {product.discount_percentage > 0 && <div className="vp-product-badge">Sale</div>}
+                            {product.images[0]
+                              ? <img src={product.images[0]} alt={product.name} />
+                              : <ProductPlaceholder name={product.name} category={product.category_name} />}
+                          </div>
+                          <div className="vp-product-info">
+                            {settings?.show_ratings !== false && (
+                              <div className="vp-rating">
+                                <span className="vp-stars">{'★'.repeat(Math.max(1, Math.round(product.rating || 5)))}</span>
+                                <span className="vp-rating-count">({product.review_count || 24})</span>
+                              </div>
+                            )}
+                            <div className="vp-product-name">{product.name}</div>
+                            <div className="vp-product-desc">{product.description || `${product.category_name || 'Store'} product from ${brandName}`}</div>
+                            <div className="vp-product-footer">
+                              <div>
+                                <span className="vp-price">₹{Math.round(product.discount_percentage > 0 ? product.discounted_price : product.price)}</span>
+                                {product.discount_percentage > 0 && <span className="vp-price-old">₹{Math.round(product.price)}</span>}
+                              </div>
+                              <button
+                                className={`vp-like-btn${liked.has(product.id) ? ' liked' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); toggleLike(product.id); }}
+                                title={liked.has(product.id) ? 'Unlike' : 'Like'}
+                              >
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill={liked.has(product.id) ? 'white' : 'none'} stroke={liked.has(product.id) ? 'white' : '#c8a96e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+
+                    {/* ── Pagination controls ── */}
+                    {totalPages > 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '32px 0 24px', flexWrap: 'wrap' }}>
+                        {/* Prev */}
+                        <button
+                          onClick={() => goToPage(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          style={{
+                            padding: '8px 14px', borderRadius: 6, border: '1px solid #ede8df',
+                            background: currentPage === 1 ? '#f5f1ea' : 'white',
+                            color: currentPage === 1 ? '#bbb' : accentColor,
+                            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                            fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500,
+                          }}
+                        >
+                          ‹ Prev
+                        </button>
+
+                        {/* Page numbers */}
+                        {pageNums.map((p, i) =>
+                          p === '...' ? (
+                            <span key={`ellipsis-${i}`} style={{ color: '#bbb', fontSize: 13, padding: '0 4px' }}>…</span>
+                          ) : (
+                            <button
+                              key={p}
+                              onClick={() => goToPage(p as number)}
+                              style={{
+                                width: 36, height: 36, borderRadius: 6,
+                                border: currentPage === p ? 'none' : '1px solid #ede8df',
+                                background: currentPage === p ? accentColor : 'white',
+                                color: currentPage === p ? 'white' : darkColor,
+                                cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+                                fontSize: 13, fontWeight: currentPage === p ? 600 : 400,
+                              }}
+                            >
+                              {p}
+                            </button>
+                          )
+                        )}
+
+                        {/* Next */}
+                        <button
+                          onClick={() => goToPage(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          style={{
+                            padding: '8px 14px', borderRadius: 6, border: '1px solid #ede8df',
+                            background: currentPage === totalPages ? '#f5f1ea' : 'white',
+                            color: currentPage === totalPages ? '#bbb' : accentColor,
+                            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                            fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500,
+                          }}
+                        >
+                          Next ›
+                        </button>
+                      </div>
+                    )}
+
+                    <div style={{ textAlign: 'center', fontSize: 12, color: '#6b5c45', paddingBottom: 32 }}>
+                      Showing {(currentPage - 1) * PRODUCTS_PER_PAGE + 1}–{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+                    </div>
+                  </>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '16px 0 32px', color: '#6b5c45', fontSize: 12 }}>
-                    All {filteredProducts.length} products shown
-                  </div>
+                  <div className="vp-empty-block">No products found{activeCategory ? ` in "${activeCategory}"` : ''}.</div>
                 )}
               </>
-            ) : (
-              <div className="vp-empty-block">No products found{activeCategory ? ` in "${activeCategory}"` : ''}.</div>
-            )}
-          </>
+            );
+          })()
         ) : (
           /* ── Normal home view: Featured + Promo + Recently Added ── */
           <>
