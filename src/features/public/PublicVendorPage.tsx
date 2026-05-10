@@ -460,7 +460,7 @@ const PublicVendorPage: React.FC = () => {
   const heroTitle = settings?.banner_text?.trim() || brandName;
   const productsPerRow = settings?.products_per_row || 4;
   const activeProducts = products
-    .filter((product) => product.status?.toLowerCase() === 'active');
+    .filter((product) => ['active', 'approved'].includes(product.status?.toLowerCase() ?? ''));
   const filteredProducts = activeCategory
     ? activeProducts.filter((p) => p.category_name === activeCategory)
     : activeProducts;
