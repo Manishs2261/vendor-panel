@@ -8,6 +8,7 @@ import notificationReducer from '../features/notifications/notificationSlice';
 import dashboardReducer from '../features/dashboard/dashboardSlice';
 import reviewReducer from '../features/reviews/reviewSlice';
 import helpReducer from '../features/help/helpSlice';
+import sponsorshipReducer from '../features/sponsorship/sponsorshipSlice';
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     dashboard: dashboardReducer,
     reviews: reviewReducer,
     help: helpReducer,
+    sponsorship: sponsorshipReducer,
   },
 });
 

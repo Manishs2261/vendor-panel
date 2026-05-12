@@ -15,6 +15,7 @@ const NAV = [
       { to: '/analytics', icon: 'A', label: 'Analytics' },
       { to: '/marketplace', icon: 'M', label: 'Marketplace' },
       { to: '/promotions', icon: '📢', label: 'Promotions' },
+      { to: '/sponsorships', icon: '⭐', label: 'Sponsorship' },
     ],
   },
   {
@@ -52,6 +53,7 @@ const PAGE_TITLES: Record<string, { title: string; sub: string }> = {
   '/reviews/shop': { title: 'Shop Reviews', sub: 'General feedback about your shop and service' },
   '/help': { title: 'Help & Feedback', sub: 'Report issues and share suggestions with our team' },
   '/promotions': { title: 'Promotions', sub: 'Sponsor your products to boost visibility' },
+  '/sponsorships': { title: 'Sponsorship', sub: 'Apply for vendor sponsorship to boost your shop visibility' },
 };
 
 const AppLayout: React.FC = () => {

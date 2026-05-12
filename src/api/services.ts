@@ -421,4 +421,13 @@ export const publicApi = {
     }>("/public/showcase"),
 };
 
+// ─── Sponsorship ─────────────────────────────────────────────────────────────
+export const sponsorshipApi = {
+  getPlans: () => apiClient.get('/sponsorships/vendor/plans'),
+  apply: (data: { plan_id: number; target_categories: number[]; target_locations: string[]; target_keywords: string[] }) =>
+    apiClient.post('/sponsorships/vendor/apply', data),
+  getMyStatus: () => apiClient.get('/sponsorships/vendor/status'),
+  cancel: (id: number) => apiClient.delete(`/sponsorships/vendor/${id}/cancel`),
+};
+
 

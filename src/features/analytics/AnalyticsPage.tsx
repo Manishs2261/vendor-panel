@@ -3,8 +3,10 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { fetchAnalytics, setPeriod } from './analyticsSlice';
+import { fetchMyRequests } from '../sponsorship/sponsorshipSlice';
 
 const CITY_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#f97316'];
 
@@ -29,12 +31,25 @@ const EMPTY_ANALYTICS = {
 
 const AnalyticsPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { data, period } = useAppSelector((s) => s.analytics);
+  const { myRequests } = useAppSelector((s) => s.sponsorship);
   const analytics = data || EMPTY_ANALYTICS;
 
   useEffect(() => {
     dispatch(fetchAnalytics(period));
+    dispatch(fetchMyRequests());
   }, [dispatch, period]);
+
+  const activeSponsorship = myRequests.find(r => r.status === 'active');
+  const pendingSponsorship = myRequests.find(r => r.status === 'pending');
+
+  const sponsorClicks = activeSponsorship?.click_count ?? 0;
+  const sponsorViews = activeSponsorship?.view_count ?? 0;
+  const sponsorCtr = sponsorViews > 0 ? ((sponsorClicks / sponsorViews) * 100).toFixed(1) : '0.0';
+  const sponsorDaysLeft = activeSponsorship?.end_date
+    ? Math.max(0, Math.ceil((new Date(activeSponsorship.end_date).getTime() - Date.now()) / 86400000))
+    : null;
 
   const tooltipStyle = {
     background: 'var(--surface2)',
@@ -51,6 +66,50 @@ const AnalyticsPage: React.FC = () => {
 
   return (
     <div>
+      {/* Sponsorship status card */}
+      {activeSponsorship ? (
+        <div onClick={() => navigate('/sponsorships')} style={{ cursor: 'pointer', background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)', border: '1px solid #6ee7b7', borderRadius: 12, padding: '14px 20px', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            <span style={{ fontSize: 22 }}>⭐</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, color: '#065f46', fontSize: 14 }}>Sponsored — Active</div>
+            </div>
+            <div style={{ fontSize: 12, color: '#065f46', fontWeight: 600 }}>View details →</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            {([
+              { label: 'Views', value: sponsorViews.toLocaleString() },
+              { label: 'Clicks', value: sponsorClicks.toLocaleString() },
+              { label: 'CTR', value: `${sponsorCtr}%` },
+              { label: 'Days Left', value: sponsorDaysLeft != null ? String(sponsorDaysLeft) : '—' },
+            ] as { label: string; value: string }[]).map((s) => (
+              <div key={s.label} style={{ background: 'rgba(255,255,255,0.55)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#065f46' }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: '#047857', marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : pendingSponsorship ? (
+        <div onClick={() => navigate('/sponsorships')} style={{ cursor: 'pointer', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
+          <span style={{ fontSize: 22 }}>⭐</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, color: '#92400e', fontSize: 14 }}>Sponsorship Under Review</div>
+            <div style={{ fontSize: 12, color: '#92400e' }}>Your application is pending admin approval</div>
+          </div>
+          <div style={{ fontSize: 12, color: '#92400e' }}>View →</div>
+        </div>
+      ) : (
+        <div onClick={() => navigate('/sponsorships')} style={{ cursor: 'pointer', background: 'var(--surface2)', border: '1px dashed var(--border)', borderRadius: 12, padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 20 }}>
+          <span style={{ fontSize: 22 }}>⭐</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Boost Your Shop Visibility</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Get sponsored to appear at the top of search results</div>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--primary, #6366f1)', fontWeight: 600 }}>Get Sponsored →</div>
+        </div>
+      )}
+
       <div className="section-header">
         <div>
           <div className="section-title">Shop Analytics</div>
