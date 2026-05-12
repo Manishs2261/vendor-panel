@@ -21,6 +21,7 @@ import AnalyticsPage from './features/analytics/AnalyticsPage';
 import ReviewsPage from './features/reviews/ReviewsPage';
 import ShopReviewsPage from './features/reviews/ShopReviewsPage';
 import HelpFeedbackPage from './features/help/HelpFeedbackPage';
+import PromotionsPage from './features/promotions/PromotionsPage';
 import { useAppDispatch } from './hooks/redux';
 import { ThemeProvider } from './context/ThemeContext';
 import './styles/global.css';
@@ -63,6 +64,7 @@ const App: React.FC = () => (
               <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/reviews/shop" element={<ShopReviewsPage />} />
               <Route path="/help" element={<HelpFeedbackPage />} />
+              <Route path="/promotions" element={<PromotionsPage />} />
             </Route>
           </Route>
 

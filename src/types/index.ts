@@ -62,6 +62,8 @@ export interface Product {
   video?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'REJECTED';
   is_featured: boolean;
+  is_sponsored: boolean;
+  sponsor_request_status: 'none' | 'pending' | 'approved' | 'rejected';
   is_deleted: boolean;
   click_count: number;
   search_count: number;

@@ -9,6 +9,7 @@ import DataTable, { Column } from '../../components/common/DataTable';
 import { StatusBadge, Pagination, ConfirmDialog } from '../../components/common';
 import type { Product } from '../../types';
 import toast from 'react-hot-toast';
+import { productApi } from '../../api/services';
 
 const ProductsPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -18,6 +19,7 @@ const ProductsPage: React.FC = () => {
   const [bulkAction, setBulkAction] = useState('');
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sponsorLoading, setSponsorLoading] = useState<string | null>(null);
 
   const formatDateTime = (value?: string) => {
     if (!value) return 'Never';
@@ -47,6 +49,19 @@ const ProductsPage: React.FC = () => {
       setDeleteTarget(null);
     } else {
       toast.error('Delete failed');
+    }
+  };
+
+  const handleSponsorRequest = async (id: string) => {
+    setSponsorLoading(id);
+    try {
+      await productApi.requestSponsorship(id);
+      toast.success('Sponsorship request submitted! Admin will review it.');
+      dispatch(fetchProducts());
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Request failed');
+    } finally {
+      setSponsorLoading(null);
     }
   };
 
@@ -204,6 +219,35 @@ const ProductsPage: React.FC = () => {
     },
     { key: 'click_count', label: 'Clicks', render: (v) => <span style={{ color: 'var(--text-muted)' }}>{v ?? 0}</span> },
     { key: 'search_count', label: 'Searches', render: (v) => <span style={{ color: 'var(--text-muted)' }}>{v ?? 0}</span> },
+    {
+      key: 'is_sponsored', label: 'Sponsor',
+      render: (_, row) => {
+        const status = row.sponsor_request_status || 'none';
+        if (row.is_sponsored) {
+          return <span style={{ background: '#6c3fc5', color: '#fff', borderRadius: 10, padding: '2px 8px', fontSize: 11 }}>📢 Sponsored</span>;
+        }
+        if (status === 'pending') {
+          return <span style={{ background: '#f0a500', color: '#fff', borderRadius: 10, padding: '2px 8px', fontSize: 11 }}>⏳ Pending</span>;
+        }
+        if (status === 'rejected') {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ background: '#e8303b', color: '#fff', borderRadius: 10, padding: '2px 8px', fontSize: 11 }}>✕ Rejected</span>
+              <button className="btn btn-ghost btn-xs" style={{ fontSize: 10 }}
+                disabled={sponsorLoading === row.id}
+                onClick={(e) => { e.stopPropagation(); handleSponsorRequest(row.id); }}>Re-request</button>
+            </div>
+          );
+        }
+        return (
+          <button className="btn btn-ghost btn-xs" style={{ fontSize: 11, border: '1px dashed var(--border)' }}
+            disabled={sponsorLoading === row.id}
+            onClick={(e) => { e.stopPropagation(); handleSponsorRequest(row.id); }}>
+            {sponsorLoading === row.id ? '...' : '📢 Request Sponsor'}
+          </button>
+        );
+      },
+    },
     {
       key: 'id', label: 'Actions',
       render: (_, row) => (

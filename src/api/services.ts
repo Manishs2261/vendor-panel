@@ -247,6 +247,9 @@ export const productApi = {
 
   toggleStatus: (id: string) =>
     apiClient.put<Product>(`/vendor/products/${id}/toggle-status`),
+
+  requestSponsorship: (id: string) =>
+    apiClient.post(`/vendor/products/${id}/sponsor-request`),
 };
 
 // â”€â”€â”€ Categories API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
