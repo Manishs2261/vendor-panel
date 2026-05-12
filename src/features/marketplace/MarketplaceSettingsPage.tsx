@@ -1,8 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { analyticsApi, shopApi } from '../../api/services';
+import { apiClient } from '../../api/client';
 
-type Tab = 'branding' | 'banner' | 'social' | 'layout';
+type Tab = 'branding' | 'banner' | 'social' | 'layout' | 'navigation';
+
+type NavItem = {
+  label: string;
+  href: string;
+  type: 'main' | 'promo';
+  children?: { label: string; href: string }[];
+};
 
 const getNestedValue = (obj: any, path: string[]): any =>
   path.reduce((o, k) => o?.[k], obj);
@@ -122,6 +130,8 @@ const MarketplaceSettingsPage: React.FC = () => {
   const [publishing, setPublishing] = useState(false);
   const [previewVersion, setPreviewVersion] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [navItems, setNavItems] = useState<NavItem[]>([]);
+  const [navSaving, setNavSaving] = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const vendorId = editorData?.vendor_id;
@@ -139,6 +149,13 @@ const MarketplaceSettingsPage: React.FC = () => {
       .catch(() => toast.error('Failed to load marketplace settings'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'navigation') return;
+    apiClient.get('/vendor/website-settings/navigation')
+      .then(({ data }) => setNavItems(data.top_navigation || []))
+      .catch(() => toast.error('Failed to load navigation settings'));
+  }, [activeTab]);
 
   // Keep localStorage in sync and broadcast live updates to all preview iframes
   // (Editor's own preview iframe via postMessage, Marketplace iframe via BroadcastChannel)
@@ -215,6 +232,53 @@ const MarketplaceSettingsPage: React.FC = () => {
     }
   };
 
+  const handleSaveNavigation = async () => {
+    setNavSaving(true);
+    try {
+      await apiClient.put('/vendor/website-settings/navigation', { top_navigation: navItems });
+      toast.success('Navigation saved');
+    } catch {
+      toast.error('Failed to save navigation');
+    } finally {
+      setNavSaving(false);
+    }
+  };
+
+  const updateNavItem = (index: number, field: string, value: string) => {
+    setNavItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const updateNavChild = (parentIndex: number, childIndex: number, field: string, value: string) => {
+    setNavItems(prev => prev.map((item, i) => {
+      if (i !== parentIndex) return item;
+      const children = [...(item.children || [])];
+      children[childIndex] = { ...children[childIndex], [field]: value };
+      return { ...item, children };
+    }));
+  };
+
+  const addNavChild = (parentIndex: number) => {
+    setNavItems(prev => prev.map((item, i) => {
+      if (i !== parentIndex) return item;
+      return { ...item, children: [...(item.children || []), { label: '', href: '' }] };
+    }));
+  };
+
+  const removeNavChild = (parentIndex: number, childIndex: number) => {
+    setNavItems(prev => prev.map((item, i) => {
+      if (i !== parentIndex) return item;
+      return { ...item, children: (item.children || []).filter((_, ci) => ci !== childIndex) };
+    }));
+  };
+
+  const removeNavItem = (index: number) => {
+    setNavItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addNavItem = (type: 'main' | 'promo') => {
+    setNavItems(prev => [...prev, { label: '', href: '', type }]);
+  };
+
   const updateSlide = (i: number, key: string, value: string) => {
     const slides = [...(draft?.banner?.slides || [{}])];
     while (slides.length <= i) slides.push({});
@@ -279,13 +343,19 @@ const MarketplaceSettingsPage: React.FC = () => {
         {/* ── Left: Editor ── */}
         <div style={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Tabs */}
-          <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 3, gap: 2 }}>
-            {(['branding', 'banner', 'social', 'layout'] as Tab[]).map((tab) => (
-              <button key={tab} type="button"
-                className={`btn btn-sm ${activeTab === tab ? 'btn-primary' : 'btn-ghost'}`}
-                style={{ flex: 1, border: 'none', textTransform: 'capitalize', fontSize: 11.5, padding: '4px 0' }}
-                onClick={() => setActiveTab(tab)}>
-                {tab === 'branding' ? '🎨' : tab === 'banner' ? '🖼' : tab === 'social' ? '📱' : '⚙️'} {tab}
+          <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 3, gap: 2, flexWrap: 'wrap' }}>
+            {([
+              { id: 'branding', icon: '🎨', label: 'Branding' },
+              { id: 'banner', icon: '🖼', label: 'Banner' },
+              { id: 'social', icon: '📱', label: 'Social' },
+              { id: 'layout', icon: '⚙️', label: 'Layout' },
+              { id: 'navigation', icon: '🔗', label: 'Nav' },
+            ] as { id: Tab; icon: string; label: string }[]).map(({ id, icon, label }) => (
+              <button key={id} type="button"
+                className={`btn btn-sm ${activeTab === id ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ flex: 1, border: 'none', fontSize: 11.5, padding: '4px 0', minWidth: 48 }}
+                onClick={() => setActiveTab(id)}>
+                {icon} {label}
               </button>
             ))}
           </div>
@@ -409,6 +479,80 @@ const MarketplaceSettingsPage: React.FC = () => {
                       onChange={(e) => setField(path, e.target.value)} placeholder={placeholder} />
                   </div>
                 ))}
+              </div>
+            )}
+
+            {activeTab === 'navigation' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div className="card-title">Site Navigation</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  These links appear in the top navigation bar of your site. Changes apply site-wide after saving.
+                </div>
+
+                {/* Main Nav */}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 12.5, marginBottom: 8 }}>Main Nav Links</div>
+                  {navItems.filter(n => n.type === 'main').map((item, rawIdx) => {
+                    const idx = navItems.indexOf(item);
+                    return (
+                      <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 10, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                          <input className="form-input" style={{ flex: 1, fontSize: 12 }} placeholder="Label"
+                            value={item.label} onChange={(e) => updateNavItem(idx, 'label', e.target.value)} />
+                          <input className="form-input" style={{ flex: 2, fontSize: 12 }} placeholder="/path or URL"
+                            value={item.href} onChange={(e) => updateNavItem(idx, 'href', e.target.value)} />
+                          <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--red, #e53e3e)', padding: '2px 8px', flexShrink: 0 }}
+                            onClick={() => removeNavItem(idx)}>✕</button>
+                        </div>
+                        {/* Dropdown children */}
+                        {(item.children || []).map((child, ci) => (
+                          <div key={ci} style={{ display: 'flex', gap: 6, marginLeft: 12, marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>↳</span>
+                            <input className="form-input" style={{ flex: 1, fontSize: 11 }} placeholder="Sub-label"
+                              value={child.label} onChange={(e) => updateNavChild(idx, ci, 'label', e.target.value)} />
+                            <input className="form-input" style={{ flex: 2, fontSize: 11 }} placeholder="/sub-path"
+                              value={child.href} onChange={(e) => updateNavChild(idx, ci, 'href', e.target.value)} />
+                            <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--red, #e53e3e)', padding: '1px 6px', fontSize: 11 }}
+                              onClick={() => removeNavChild(idx, ci)}>✕</button>
+                          </div>
+                        ))}
+                        <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10.5, marginLeft: 12, marginTop: 2 }}
+                          onClick={() => addNavChild(idx)}>
+                          + Add dropdown item
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 11.5 }}
+                    onClick={() => addNavItem('main')}>+ Add Main Link</button>
+                </div>
+
+                {/* Promo Bar */}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 12.5, marginBottom: 4 }}>Promo Bar Links</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>Shown on the right side of the navbar</div>
+                  {navItems.filter(n => n.type === 'promo').map((item) => {
+                    const idx = navItems.indexOf(item);
+                    return (
+                      <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                        <input className="form-input" style={{ flex: 1, fontSize: 12 }} placeholder="Label"
+                          value={item.label} onChange={(e) => updateNavItem(idx, 'label', e.target.value)} />
+                        <input className="form-input" style={{ flex: 2, fontSize: 12 }} placeholder="/path or URL"
+                          value={item.href} onChange={(e) => updateNavItem(idx, 'href', e.target.value)} />
+                        <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--red, #e53e3e)', padding: '2px 8px' }}
+                          onClick={() => removeNavItem(idx)}>✕</button>
+                      </div>
+                    );
+                  })}
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 11.5 }}
+                    onClick={() => addNavItem('promo')}>+ Add Promo Link</button>
+                </div>
+
+                {/* Save */}
+                <button className="btn btn-primary btn-sm" onClick={handleSaveNavigation} disabled={navSaving}
+                  style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                  {navSaving ? <span className="spinner" /> : '💾 Save Navigation'}
+                </button>
               </div>
             )}
 
